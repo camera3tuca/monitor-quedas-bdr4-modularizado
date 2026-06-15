@@ -9,7 +9,7 @@ import pytz
 import warnings
 import re
 
-from modules.fundamentals import mapear_ticker_us
+from modules.fundamentals import mapear_ticker_us, NOMES_BDRS
 
 
 def eh_etf(ticker_bdr):
@@ -20,15 +20,187 @@ def eh_etf(ticker_bdr):
     return str(ticker_bdr).strip().upper().endswith('39')
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# MAPA DE CORREÇÃO — BDR de ETF -> ticker REAL do fundo no Yahoo Finance
+# ──────────────────────────────────────────────────────────────────────────
+# O BDR_TO_US_MAP em fundamentals.py foi gerado de forma heurística e, para
+# vários ETFs (terminação 39), o ticker resultante não corresponde ao
+# símbolo real do fundo no Yahoo (ex.: BUSM39 -> 'BUSM', que não existe;
+# o fundo correto é o iShares MSCI USA Min Vol Factor ETF = 'USMV').
+#
+# Este mapa cobre os casos conhecidos de divergência. Quando o ticker BDR
+# não estiver aqui, o código tenta o mapeamento padrão e, em seguida,
+# busca pelo NOME do fundo via yf.Search como fallback.
+ETF_TICKER_CORRECAO = {
+    'AADA39': 'EZA',     # 21Shares / South Africa ETP (aprox.)
+    'ABGD39': 'AGGY',    # abrdn Gold ETF Trust (aprox. — pode variar)
+    'ACWX39': 'ACWX',
+    'ARGT39': 'ARGT',
+    'BACW39': 'ACWI',
+    'BAER39': 'ITA',
+    'BAGG39': 'AGG',
+    'BAOR39': 'AOR',
+    'BARY39': 'IRBO',
+    'BASK39': 'BASK',
+    'BBJP39': 'BBJP',
+    'BBUG39': 'BUG',
+    'BCAT39': 'SPCX',
+    'BCHI39': 'MCHI',
+    'BCIR39': 'CIBR',
+    'BCLO39': 'CLOU',
+    'BCNY39': 'CNYA',
+    'BCOM39': 'COMB',
+    'BCPX39': 'COPX',
+    'BCTE39': 'CTEC',
+    'BCWV39': 'ACWV',
+    'BDVD39': 'SDIV',
+    'BDVE39': 'DVYE',
+    'BDVY39': 'DVY',
+    'BECH39': 'ECH',
+    'BEEM39': 'EEM',
+    'BEFA39': 'EFA',
+    'BEFG39': 'EFG',
+    'BEFV39': 'EFV',
+    'BEGD39': 'ESGD',
+    'BEGE39': 'ESGE',
+    'BEGU39': 'ESGU',
+    'BEIS39': 'EIS',
+    'BEMV39': 'EEMV',
+    'BEPP39': 'IPAC',
+    'BEPU39': 'EPU',
+    'BEWA39': 'EWA',
+    'BEWC39': 'EWC',
+    'BEWD39': 'EWD',
+    'BEWG39': 'EWG',
+    'BEWH39': 'EWH',
+    'BEWJ39': 'EWJ',
+    'BEWL39': 'EWL',
+    'BEWP39': 'EWP',
+    'BEWS39': 'EWS',
+    'BEWW39': 'EWW',
+    'BEWY39': 'EWY',
+    'BEWZ39': 'EWZ',
+    'BEZA39': 'EZA',
+    'BEZU39': 'EZU',
+    'BFAV39': 'EFAV',
+    'BFLO39': 'FLOT',
+    'BFXI39': 'FXI',
+    'BGLC39': 'IOO',
+    'BGOV39': 'GOVT',
+    'BGOZ39': 'GOVZ',
+    'BGRT39': 'REET',
+    'BGWH39': 'DGRO',
+    'BHEF39': 'HEFA',
+    'BHER39': 'HERO',
+    'BHYC39': 'SHYG',
+    'BHYG39': 'HYG',
+    'BIAI39': 'IAI',
+    'BIAU39': 'IAU',
+    'BIBB39': 'IBB',
+    'BICL39': 'ICLN',
+    'BICI39': 'IBIT',
+    'BIEF39': 'IEFA',
+    'BIEI39': 'IEI',
+    'BIEM39': 'IEMG',
+    'BIEO39': 'IEO',
+    'BIEU39': 'IEUR',
+    'BIEV39': 'IEV',
+    'BIGF39': 'IGF',
+    'BIGS39': 'IGSB',
+    'BIHE39': 'IHE',
+    'BIHF39': 'IHF',
+    'BIHI39': 'IHI',
+    'BIJH39': 'IJH',
+    'BIJR39': 'IJR',
+    'BIJS39': 'IJS',
+    'BIJT39': 'IJT',
+    'BILF39': 'ILF',
+    'BIPC39': 'IPAC',
+    'BITB39': 'ITB',
+    'BITO39': 'ITOT',
+    'BIUS39': 'IUSB',
+    'BIVB39': 'IVV',
+    'BIVE39': 'IVE',
+    'BIVW39': 'IVW',
+    'BIWF39': 'IWF',
+    'BIWM39': 'IWM',
+    'BIXG39': 'IXG',
+    'BIXJ39': 'IXJ',
+    'BIXN39': 'IXN',
+    'BIXU39': 'IXUS',
+    'BIYE39': 'IYE',
+    'BIYF39': 'IYF',
+    'BIYJ39': 'IYJ',
+    'BIYT39': 'IEF',
+    'BIYW39': 'IYW',
+    'BIYZ39': 'IYZ',
+    'BJQU39': 'JQUA',
+    'BKCH39': 'BLOK',
+    'BKWB39': 'KWEB',
+    'BKXI39': 'KXI',
+    'BLBT39': 'LIT',
+    'BLPX39': 'MLPA',
+    'BLQD39': 'LQD',
+    'BMTU39': 'MTUM',
+    'BNDA39': 'INDA',
+    'BOEF39': 'OEF',
+    'BOTZ39': 'BOTZ',
+    'BPIC39': 'PICK',
+    'BPVE39': 'PAVE',
+    'BQQW39': 'QQEW',
+    'BQUA39': 'QUAL',
+    'BQYL39': 'QYLD',
+    'BSCZ39': 'SCZ',
+    'BSDV39': 'DIV',
+    'BSHV39': 'SHV',
+    'BSHY39': 'SHY',
+    'BSIL39': 'SIL',
+    'BSIZ39': 'SIZE',
+    'BSLV39': 'SLV',
+    'BSOC39': 'SOCL',
+    'BSOX39': 'SOXX',
+    'BSRE39': 'SRET',
+    'BTFL39': 'TFLO',
+    'BTIP39': 'TIP',
+    'BTLT39': 'TLT',
+    'BURA39': 'URA',
+    'BURT39': 'URTH',
+    'BUSM39': 'USMV',
+    'BUSR39': 'USRT',
+    'BUTL39': 'IDU',
+    'CRYP39': 'BLOK',
+    'DOLL39': 'BIL',
+    'DTCR39': 'IDGT',
+    'EIDO39': 'EIDO',
+    'EPHE39': 'EPHE',
+    'ETHA39': 'ETHA',
+    'EWJV39': 'EWJV',
+    'GDXB39': 'GDX',
+    'HYEM39': 'HYEM',
+    'RSSL39': 'IWM',
+    'SIVR39': 'SIVR',
+    'SLXB39': 'SLX',
+    'SMIN39': 'SMIN',
+    'SOLN39': 'SGOL',
+    'TBIL39': 'BIL',
+    'TOPB39': 'OEF',
+    'AETH39': 'ETHA',
+    'ANGV39': 'ANGL',
+    'AXRP39': 'XRP',
+}
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def buscar_dados_etf(ticker_bdr):
     """
     Busca dados detalhados do ETF correspondente via yfinance.
 
-    Tenta usar o ticker US mapeado (BDR_TO_US_MAP); caso não exista
-    ou não retorne dados de ETF, tenta o ticker BDR direto (sem .SA)
-    como fallback — muitos ETFs internacionais usam o mesmo símbolo
-    em diferentes bolsas/feeds do Yahoo.
+    Estratégia de fallback em cascata:
+      1. Ticker corrigido manualmente (ETF_TICKER_CORRECAO), quando existe.
+      2. Ticker US mapeado (BDR_TO_US_MAP) via mapear_ticker_us.
+      3. Ticker BDR sem o sufixo numérico (fallback genérico).
+      4. Busca pelo NOME do fundo (NOMES_BDRS) via yf.Search — útil quando
+         nenhum dos tickers acima é válido no Yahoo.
 
     Retorna dict com:
         erro
@@ -45,27 +217,42 @@ def buscar_dados_etf(ticker_bdr):
         variacao_dia
         volume
         beta
+        max_52s, min_52s
         top_holdings: list[{'symbol','name','pct'}]
         setores: list[{'setor','pct'}]
         descricao
     """
-    ticker_us = mapear_ticker_us(ticker_bdr)
+    ticker_bdr = str(ticker_bdr).strip().upper()
+    ticker_us  = mapear_ticker_us(ticker_bdr)
 
     candidatos = []
+
+    # 1. Correção manual conhecida
+    if ticker_bdr in ETF_TICKER_CORRECAO:
+        candidatos.append(ETF_TICKER_CORRECAO[ticker_bdr])
+
+    # 2. Mapeamento padrão (BDR_TO_US_MAP)
     if ticker_us and ticker_us != ticker_bdr:
         candidatos.append(ticker_us)
-    candidatos.append(ticker_bdr.rstrip('0123456789'))
+
+    # 3. Fallback genérico — remove sufixo numérico
+    stripped = ticker_bdr.rstrip('0123456789')
+    if stripped:
+        candidatos.append(stripped)
+
     # remove duplicados preservando ordem
     vistos = set()
     candidatos = [c for c in candidatos if c and not (c in vistos or vistos.add(c))]
 
-    for tk in candidatos:
+    def _tentar_ticker(tk):
+        """Tenta buscar dados de fundo para um ticker específico."""
         try:
             t = yf.Ticker(tk)
             info = t.info or {}
+            if not info or len(info) < 3:
+                return None
 
             quote_type = (info.get('quoteType') or '').upper()
-            # Aceita ETF explicitamente, ou qualquer info que tenha campos típicos de fundo
             tem_campos_fundo = any([
                 info.get('totalAssets'),
                 info.get('fundFamily'),
@@ -73,87 +260,120 @@ def buscar_dados_etf(ticker_bdr):
                 info.get('navPrice'),
             ])
             if quote_type != 'ETF' and not tem_campos_fundo:
-                continue
+                return None
 
-            # ── Top holdings ──────────────────────────────────────────────
-            top_holdings = []
-            try:
-                hold_df = t.funds_data.top_holdings if hasattr(t, 'funds_data') else None
-                if hold_df is not None and not hold_df.empty:
-                    for idx, row in hold_df.head(10).iterrows():
-                        top_holdings.append({
-                            'symbol': str(idx),
-                            'name': str(row.get('Name', idx)),
-                            'pct': float(row.get('Holding Percent', 0)) * 100,
-                        })
-            except Exception:
-                pass
-
-            # ── Setores ───────────────────────────────────────────────────
-            setores = []
-            try:
-                sec_weights = t.funds_data.sector_weightings if hasattr(t, 'funds_data') else None
-                if sec_weights:
-                    nomes_pt = {
-                        'realestate': 'Imóveis', 'consumer_cyclical': 'Consumo Cíclico',
-                        'basic_materials': 'Materiais Básicos', 'consumer_defensive': 'Consumo Defensivo',
-                        'technology': 'Tecnologia', 'communication_services': 'Comunicação',
-                        'financial_services': 'Serviços Financeiros', 'utilities': 'Utilidades',
-                        'industrials': 'Industrial', 'energy': 'Energia', 'healthcare': 'Saúde',
-                    }
-                    for setor, peso in sec_weights.items():
-                        if peso and peso > 0:
-                            setores.append({
-                                'setor': nomes_pt.get(setor, setor.replace('_', ' ').title()),
-                                'pct': float(peso) * 100,
-                            })
-                    setores.sort(key=lambda x: x['pct'], reverse=True)
-            except Exception:
-                pass
-
-            # ── Preço / variação ──────────────────────────────────────────
-            preco = info.get('regularMarketPrice') or info.get('previousClose')
-            preco_ant = info.get('regularMarketPreviousClose') or info.get('previousClose')
-            variacao_dia = None
-            if preco and preco_ant and preco_ant != 0:
-                variacao_dia = (preco - preco_ant) / preco_ant * 100
-
-            # ── Expense ratio ─────────────────────────────────────────────
-            expense_ratio = info.get('netExpenseRatio') or info.get('annualReportExpenseRatio')
-            if expense_ratio and expense_ratio < 1:
-                # já vem como fração (ex.: 0.0009 = 0.09%)
-                expense_ratio = expense_ratio * 100
-
-            # ── YTD return ────────────────────────────────────────────────
-            ytd = info.get('ytdReturn')
-            if ytd is not None:
-                ytd = ytd * 100
-
-            return {
-                'erro': None,
-                'ticker_fonte': tk,
-                'nome': info.get('longName') or info.get('shortName') or tk,
-                'categoria': info.get('category', 'N/A'),
-                'familia_fundo': info.get('fundFamily', 'N/A'),
-                'patrimonio': info.get('totalAssets'),
-                'expense_ratio': expense_ratio,
-                'ytd_return': ytd,
-                'yield_div': (info.get('yield') * 100) if info.get('yield') else None,
-                'nav': info.get('navPrice'),
-                'preco': preco,
-                'variacao_dia': variacao_dia,
-                'volume': info.get('regularMarketVolume') or info.get('volume'),
-                'beta': info.get('beta3Year') or info.get('beta'),
-                'max_52s': info.get('fiftyTwoWeekHigh'),
-                'min_52s': info.get('fiftyTwoWeekLow'),
-                'top_holdings': top_holdings,
-                'setores': setores,
-                'descricao': info.get('longBusinessSummary', ''),
-            }
+            return _montar_resultado(t, info, tk)
         except Exception:
-            continue
+            return None
+
+    # ── Tentativas 1-3: tickers candidatos diretos ──────────────────────────
+    for tk in candidatos:
+        resultado = _tentar_ticker(tk)
+        if resultado:
+            return resultado
+
+    # ── Tentativa 4: busca pelo nome do fundo via yf.Search ─────────────────
+    try:
+        nome_fundo = NOMES_BDRS.get(ticker_bdr, '')
+        if nome_fundo:
+            # Remove sufixos genéricos que poluem a busca
+            nome_busca = re.sub(
+                r'\b(ETF|ETP|Trust|Fund|Shares?|Sponsored|ADR|ADS)\b',
+                '', nome_fundo, flags=re.IGNORECASE
+            ).strip()
+            if nome_busca:
+                resultado_busca = yf.Search(nome_busca, max_results=8)
+                quotes = resultado_busca.quotes if hasattr(resultado_busca, 'quotes') else []
+                for q in quotes:
+                    tipo = (q.get('quoteType') or '').upper()
+                    symbol = q.get('symbol', '')
+                    if tipo == 'ETF' and symbol and '.' not in symbol:
+                        resultado = _tentar_ticker(symbol)
+                        if resultado:
+                            return resultado
+    except Exception:
+        pass
 
     return {'erro': f'Não foi possível obter dados de ETF para {ticker_bdr} (US: {ticker_us}).'}
+
+
+def _montar_resultado(t, info, ticker_fonte):
+    """Monta o dicionário padronizado de resposta a partir de um yf.Ticker já validado."""
+
+    # ── Top holdings ──────────────────────────────────────────────────────────
+    top_holdings = []
+    try:
+        hold_df = t.funds_data.top_holdings if hasattr(t, 'funds_data') else None
+        if hold_df is not None and not hold_df.empty:
+            for idx, row in hold_df.head(10).iterrows():
+                top_holdings.append({
+                    'symbol': str(idx),
+                    'name': str(row.get('Name', idx)),
+                    'pct': float(row.get('Holding Percent', 0)) * 100,
+                })
+    except Exception:
+        pass
+
+    # ── Setores ───────────────────────────────────────────────────────────────
+    setores = []
+    try:
+        sec_weights = t.funds_data.sector_weightings if hasattr(t, 'funds_data') else None
+        if sec_weights:
+            nomes_pt = {
+                'realestate': 'Imóveis', 'consumer_cyclical': 'Consumo Cíclico',
+                'basic_materials': 'Materiais Básicos', 'consumer_defensive': 'Consumo Defensivo',
+                'technology': 'Tecnologia', 'communication_services': 'Comunicação',
+                'financial_services': 'Serviços Financeiros', 'utilities': 'Utilidades',
+                'industrials': 'Industrial', 'energy': 'Energia', 'healthcare': 'Saúde',
+            }
+            for setor, peso in sec_weights.items():
+                if peso and peso > 0:
+                    setores.append({
+                        'setor': nomes_pt.get(setor, setor.replace('_', ' ').title()),
+                        'pct': float(peso) * 100,
+                    })
+            setores.sort(key=lambda x: x['pct'], reverse=True)
+    except Exception:
+        pass
+
+    # ── Preço / variação ──────────────────────────────────────────────────────
+    preco = info.get('regularMarketPrice') or info.get('previousClose')
+    preco_ant = info.get('regularMarketPreviousClose') or info.get('previousClose')
+    variacao_dia = None
+    if preco and preco_ant and preco_ant != 0:
+        variacao_dia = (preco - preco_ant) / preco_ant * 100
+
+    # ── Expense ratio ─────────────────────────────────────────────────────────
+    expense_ratio = info.get('netExpenseRatio') or info.get('annualReportExpenseRatio')
+    if expense_ratio and expense_ratio < 1:
+        expense_ratio = expense_ratio * 100
+
+    # ── YTD return ────────────────────────────────────────────────────────────
+    ytd = info.get('ytdReturn')
+    if ytd is not None:
+        ytd = ytd * 100
+
+    return {
+        'erro': None,
+        'ticker_fonte': ticker_fonte,
+        'nome': info.get('longName') or info.get('shortName') or ticker_fonte,
+        'categoria': info.get('category', 'N/A'),
+        'familia_fundo': info.get('fundFamily', 'N/A'),
+        'patrimonio': info.get('totalAssets'),
+        'expense_ratio': expense_ratio,
+        'ytd_return': ytd,
+        'yield_div': (info.get('yield') * 100) if info.get('yield') else None,
+        'nav': info.get('navPrice'),
+        'preco': preco,
+        'variacao_dia': variacao_dia,
+        'volume': info.get('regularMarketVolume') or info.get('volume'),
+        'beta': info.get('beta3Year') or info.get('beta'),
+        'max_52s': info.get('fiftyTwoWeekHigh'),
+        'min_52s': info.get('fiftyTwoWeekLow'),
+        'top_holdings': top_holdings,
+        'setores': setores,
+        'descricao': info.get('longBusinessSummary', ''),
+    }
 
 
 def renderizar_painel_etf(dados, ticker_bdr, empresa):
