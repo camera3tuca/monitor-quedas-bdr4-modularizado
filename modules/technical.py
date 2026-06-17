@@ -25,7 +25,25 @@ def buscar_dados(tickers):
         if df.empty: return pd.DataFrame()
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = pd.MultiIndex.from_tuples([(c[0], c[1].replace(".SA", "")) for c in df.columns])
-        return df.dropna(axis=1, how='all')
+
+        df = df.dropna(axis=1, how='all')
+
+        # Preencher dados faltantes para BDRs ilíquidas
+        idx = pd.IndexSlice
+        if isinstance(df.columns, pd.MultiIndex):
+            for col in ['Close', 'High', 'Low', 'Open']:
+                if col in df.columns.levels[0]:
+                    df.loc[:, idx[col, :]] = df.loc[:, idx[col, :]].ffill()
+            if 'Volume' in df.columns.levels[0]:
+                df.loc[:, idx['Volume', :]] = df.loc[:, idx['Volume', :]].fillna(0)
+        else:
+            for col in ['Close', 'High', 'Low', 'Open']:
+                if col in df.columns:
+                    df[col] = df[col].ffill()
+            if 'Volume' in df.columns:
+                df['Volume'] = df['Volume'].fillna(0)
+
+        return df
     except Exception: return pd.DataFrame()
 
 
