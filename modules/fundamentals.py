@@ -890,8 +890,8 @@ def calcular_score_fundamentalista(info):
 
 def buscar_dados_brapi(ticker_bdr):
     """
-    Busca dados da BDR diretamente na BRAPI (B3)
-    Retorna dict com dados ou None
+    Busca dados básicos da BDR diretamente na BRAPI (B3).
+    Retorna dict com dados ou None.
     """
     try:
         url = f"https://brapi.dev/api/quote/{ticker_bdr}?token={BRAPI_TOKEN}"
@@ -907,7 +907,6 @@ def buscar_dados_brapi(ticker_bdr):
 
         result = data['results'][0]
 
-        # Extrair dados disponíveis
         return {
             'preco': result.get('regularMarketPrice'),
             'variacao': result.get('regularMarketChangePercent'),
@@ -921,9 +920,106 @@ def buscar_dados_brapi(ticker_bdr):
         return None
 
 
+def buscar_dados_brapi_completo(ticker_bdr):
+    """
+    Busca dados fundamentalistas completos da BDR via BRAPI com módulos
+    avançados: summaryDetail, financialData, defaultKeyStatistics.
+    Retorna dict compatível com _score_from_yf_info ou None.
+    """
+    try:
+        modulos = (
+            "summaryProfile,summaryDetail,financialData,"
+            "defaultKeyStatistics,earnings"
+        )
+        url = (
+            f"https://brapi.dev/api/quote/{ticker_bdr}"
+            f"?modules={modulos}&token={BRAPI_TOKEN}"
+        )
+        response = requests.get(url, timeout=15)
+
+        if response.status_code != 200:
+            return None
+
+        data = response.json()
+        if 'results' not in data or not data['results']:
+            return None
+
+        r = data['results'][0]
+
+        # Módulos retornados dentro de r
+        summary     = r.get('summaryDetail', {}) or {}
+        financial   = r.get('financialData', {}) or {}
+        key_stats   = r.get('defaultKeyStatistics', {}) or {}
+        profile     = r.get('summaryProfile', {}) or {}
+
+        def _val(d, *keys):
+            """Extrai valor numérico de dict aninhado ou lista de chaves."""
+            for k in keys:
+                v = d.get(k)
+                if v is None:
+                    continue
+                if isinstance(v, dict):
+                    v = v.get('raw', v.get('fmt'))
+                if isinstance(v, (int, float)):
+                    return v
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    pass
+            return None
+
+        pe          = _val(summary,   'trailingPE',   'forwardPE')
+        forward_pe  = _val(summary,   'forwardPE')
+        dy          = _val(summary,   'dividendYield', 'trailingAnnualDividendYield')
+        mcap        = _val(summary,   'marketCap')
+        beta        = _val(summary,   'beta')
+
+        roe         = _val(financial, 'returnOnEquity')
+        profit_mg   = _val(financial, 'profitMargins')
+        rev_growth  = _val(financial, 'revenueGrowth')
+        gross_mg    = _val(financial, 'grossMargins')
+        rec_raw     = financial.get('recommendationKey', '')
+
+        eps_fwd     = _val(key_stats, 'forwardEps')
+        peg         = _val(key_stats, 'pegRatio')
+        short_pct   = _val(key_stats, 'shortPercentOfFloat')
+
+        sector      = profile.get('sector', r.get('sector', 'N/A'))
+        industry    = profile.get('industry', 'N/A')
+
+        # Mínimo de dados para ser útil
+        if not any([pe, mcap, rev_growth, roe]):
+            return None
+
+        return {
+            'trailingPE':        pe,
+            'forwardPE':         forward_pe,
+            'dividendYield':     dy,
+            'marketCap':         mcap,
+            'revenueGrowth':     rev_growth,
+            'returnOnEquity':    roe,
+            'profitMargins':     profit_mg,
+            'grossMargins':      gross_mg,
+            'recommendationKey': rec_raw,
+            'forwardEps':        eps_fwd,
+            'pegRatio':          peg,
+            'beta':              beta,
+            'shortPercentOfFloat': short_pct,
+            'sector':            sector,
+            'industry':          industry,
+            # Campos extras para exibição
+            '_volume_b3':        r.get('regularMarketVolume'),
+            '_preco_b3':         r.get('regularMarketPrice'),
+            '_variacao_b3':      r.get('regularMarketChangePercent'),
+        }
+    except Exception:
+        return None
+
+
 def calcular_score_brapi(dados_brapi):
     """
-    Calcula score baseado em dados da BRAPI (mais limitados)
+    Calcula score baseado em dados básicos da BRAPI (preço/volume apenas).
+    Usado como fallback quando os módulos avançados não retornam dados.
     """
     score = 50
     detalhes = {
@@ -1778,10 +1874,10 @@ NOMES_BDRS = {
 def buscar_dados_fundamentalistas(ticker_bdr):
     """
     Busca dados fundamentalistas com fallback em cascata:
-    1. Yahoo Finance com ticker US mapeado (empresa mãe)
-    2. Yahoo Finance com variantes do ticker (sufixo .SA removido, etc.)
-    3. OpenBB / FMP com chave configurada
-    4. BRAPI como último recurso
+    1. Yahoo Finance — empresa mãe (ticker US mapeado)
+    2. BRAPI módulos completos — BDR na B3 com financialData/summaryDetail
+    3. OpenBB / FMP — empresa mãe via API alternativa
+    4. BRAPI básico — último recurso (preço e volume apenas)
     """
     ticker_us = mapear_ticker_us(ticker_bdr)
 
@@ -1858,6 +1954,38 @@ def buscar_dados_fundamentalistas(ticker_bdr):
         else:
             det['market_cap'] = {'valor': None, 'pontos': 0, 'criterio': ''}
 
+        # ROE — Return on Equity (10 pontos)
+        roe = info.get('returnOnEquity')
+        if roe and isinstance(roe, (int, float)):
+            det['roe'] = {'valor': roe, 'pontos': 0, 'criterio': ''}
+            if roe > 0.20:    score += 10; det['roe'].update(pontos=10, criterio='Excelente (>20%)')
+            elif roe > 0.10:  score +=  5; det['roe'].update(pontos=5,  criterio='Bom (>10%)')
+            elif roe < 0:     score -=  5; det['roe'].update(pontos=-5, criterio='Negativo')
+            else:                          det['roe']['criterio'] = 'Regular (0-10%)'
+        else:
+            det['roe'] = {'valor': None, 'pontos': 0, 'criterio': ''}
+
+        # Margem de Lucro (8 pontos)
+        pm = info.get('profitMargins')
+        if pm and isinstance(pm, (int, float)):
+            det['profit_margin'] = {'valor': pm, 'pontos': 0, 'criterio': ''}
+            if pm > 0.20:    score += 8; det['profit_margin'].update(pontos=8, criterio='Excelente (>20%)')
+            elif pm > 0.10:  score += 4; det['profit_margin'].update(pontos=4, criterio='Boa (>10%)')
+            elif pm < 0:     score -= 5; det['profit_margin'].update(pontos=-5, criterio='Negativa')
+            else:                        det['profit_margin']['criterio'] = 'Regular (0-10%)'
+        else:
+            det['profit_margin'] = {'valor': None, 'pontos': 0, 'criterio': ''}
+
+        # PEG Ratio (5 pontos — penaliza crescimento caro)
+        peg = info.get('pegRatio')
+        if peg and isinstance(peg, (int, float)) and peg > 0:
+            det['peg'] = {'valor': peg, 'pontos': 0, 'criterio': ''}
+            if peg < 1:      score += 5; det['peg'].update(pontos=5,  criterio='Subavaliado (<1)')
+            elif peg <= 2:   score += 2; det['peg'].update(pontos=2,  criterio='Justo (1-2)')
+            else:            score -= 3; det['peg'].update(pontos=-3, criterio='Caro (>2)')
+        else:
+            det['peg'] = {'valor': None, 'pontos': 0, 'criterio': ''}
+
         score = max(0, min(100, score))
 
         return {
@@ -1870,7 +1998,15 @@ def buscar_dados_fundamentalistas(ticker_bdr):
             'market_cap':     det['market_cap']['valor'],
             'revenue_growth': det['revenue_growth']['valor'],
             'recomendacao':   det['recomendacao']['valor'],
+            'roe':            det['roe']['valor'],
+            'profit_margin':  det['profit_margin']['valor'],
+            'peg':            det['peg']['valor'],
             'setor':          info.get('sector', 'N/A'),
+            'industry':       info.get('industry', 'N/A'),
+            # Dados B3 quando disponíveis (BRAPI)
+            'volume_b3':      info.get('_volume_b3'),
+            'preco_b3':       info.get('_preco_b3'),
+            'variacao_b3':    info.get('_variacao_b3'),
         }
 
     # ------------------------------------------------------------------
@@ -1938,9 +2074,23 @@ def buscar_dados_fundamentalistas(ticker_bdr):
         pass
 
     # ------------------------------------------------------------------
+    # TENTATIVA 2: BRAPI módulos completos — financialData/summaryDetail
+    # Dados diretamente do BDR listado na B3 com métricas fundamentais.
     # ------------------------------------------------------------------
-    # TENTATIVA 3: OpenBB / FMP — empresa mãe
+    try:
+        info_brapi_full = buscar_dados_brapi_completo(ticker_bdr)
+        resultado = _score_from_yf_info(
+            info_brapi_full,
+            f'BRAPI (B3) — {ticker_bdr}',
+            ticker_bdr,
+        )
+        if resultado:
+            return resultado
+    except Exception:
+        pass
+
     # ------------------------------------------------------------------
+    # TENTATIVA 3: OpenBB / FMP — empresa mãe via API alternativa
     # ------------------------------------------------------------------
     try:
         info_obb = buscar_dados_openbb(ticker_us)
@@ -1951,16 +2101,14 @@ def buscar_dados_fundamentalistas(ticker_bdr):
         pass
 
     # ------------------------------------------------------------------
-    # ------------------------------------------------------------------
-    # TENTATIVA 4: BRAPI — BDR na B3 (último recurso)
-    # ------------------------------------------------------------------
+    # TENTATIVA 4: BRAPI básico — preço e volume apenas (último recurso)
     # ------------------------------------------------------------------
     try:
         dados_brapi = buscar_dados_brapi(ticker_bdr)
         if dados_brapi:
             score, detalhes = calcular_score_brapi(dados_brapi)
             return {
-                'fonte': 'BRAPI (BDR na B3)',
+                'fonte': 'BRAPI básico (B3)',
                 'ticker_fonte': ticker_bdr,
                 'score': score,
                 'detalhes': detalhes,
@@ -1969,8 +2117,14 @@ def buscar_dados_fundamentalistas(ticker_bdr):
                 'market_cap': dados_brapi.get('market_cap'),
                 'revenue_growth': None,
                 'recomendacao': None,
+                'roe': None,
+                'profit_margin': None,
+                'peg': None,
                 'setor': dados_brapi.get('setor', 'N/A'),
+                'industry': 'N/A',
                 'volume_b3': dados_brapi.get('volume'),
+                'preco_b3': dados_brapi.get('preco'),
+                'variacao_b3': dados_brapi.get('variacao'),
             }
     except Exception:
         pass
