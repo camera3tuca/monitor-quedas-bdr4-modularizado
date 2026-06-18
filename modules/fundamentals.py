@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 import html as html_lib
 import re
 
-BRAPI_TOKEN = "iExnKM1xcbQcYL3cNPhPQ3"  # Token gratuito da BRAPI
+BRAPI_TOKEN = st.secrets.get("BRAPI_TOKEN", "iExnKM1xcbQcYL3cNPhPQ3")  # Token gratuito da BRAPI
 
 
 BDR_TO_US_MAP = {
@@ -966,7 +966,7 @@ def calcular_score_brapi(dados_brapi):
     return max(0, min(100, score)), detalhes
 
 
-FMP_API_KEY = "tBsRam74Ac6bZRWS3C8HY83C6not17Uh"
+FMP_API_KEY = st.secrets.get("FMP_API_KEY", "tBsRam74Ac6bZRWS3C8HY83C6not17Uh")
 
 
 def buscar_dados_openbb(ticker_us):
