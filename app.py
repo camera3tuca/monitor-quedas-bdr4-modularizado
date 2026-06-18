@@ -231,6 +231,7 @@ with st.expander("📚 Guia dos Indicadores - Entenda os Sinais", expanded=False
 st.markdown("---")
 
 if st.button("🔄 Atualizar Análise", type="primary"):
+    buscar_dados.clear()
     with st.spinner("Conectando à API e baixando dados..."):
         # Usar dicionário local de BDRs em vez de buscar da BRAPI
         lista_bdrs = list(NOMES_BDRS.keys())
