@@ -968,10 +968,14 @@ def buscar_dados_brapi_completo(ticker_bdr):
                     pass
             return None
 
-        pe          = _val(summary,   'trailingPE',   'forwardPE')
-        forward_pe  = _val(summary,   'forwardPE')
+        pe          = (_val(summary,    'trailingPE', 'forwardPE')
+                       or _val(key_stats, 'trailingPE', 'forwardPE'))
+        forward_pe  = (_val(summary,    'forwardPE')
+                       or _val(key_stats, 'forwardPE'))
         dy          = _val(summary,   'dividendYield', 'trailingAnnualDividendYield')
-        mcap        = _val(summary,   'marketCap')
+        mcap        = (_val(summary,   'marketCap')
+                       or _val(key_stats, 'marketCap')
+                       or (r.get('marketCap') if isinstance(r.get('marketCap'), (int, float)) else None))
         beta        = _val(summary,   'beta')
 
         roe         = _val(financial, 'returnOnEquity')
