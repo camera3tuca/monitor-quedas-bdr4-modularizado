@@ -27,6 +27,7 @@ from modules.technical import *
 from modules.styles import *
 from modules.etf import *
 from modules.etf import eh_etf, buscar_dados_etf
+from modules.flow import renderizar_painel_flow
 
 st.set_page_config(
     page_title="Monitor BDRs - Swing Trade",
@@ -908,6 +909,13 @@ if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
             # === ANÁLISE DE FASE — METODOLOGIA MINERVINI ===
             resultado_mv = _calcular_minervini_cached(ticker)
             renderizar_painel_minervini(resultado_mv, ticker, row['Empresa'])
+
+            # === FLOW.AI — FLUXO DE BIG PLAYERS ===
+            try:
+                df_flow_input = df_calc.xs(ticker, axis=1, level=1).dropna()
+                renderizar_painel_flow(df_flow_input, ticker, row['Empresa'])
+            except Exception:
+                pass
 
             # === TRADINGVIEW SCREENER — DADOS AO VIVO ===
             ticker_us_tv = mapear_ticker_us(ticker)
