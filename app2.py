@@ -12,7 +12,27 @@ import xml.etree.ElementTree as ET
 import html as html_lib
 import re
 
+# --- CONFIGURAÇÃO DA PÁGINA ---
+st.set_page_config(
+    page_title="Monitor BDRs - Swing Trade",
+    page_icon="📉",
+    layout="wide"
+)
 
+warnings.filterwarnings('ignore')
+plt.style.use('seaborn-v0_8-darkgrid')
+sns.set_palette("husl")
+
+PERIODO = "1y"  # 1 ano para ter dados suficientes para EMA200 (~252 dias úteis)
+TERMINACOES_BDR = ('31', '32', '33', '34', '35', '39')
+
+# Token BRAPI para dados alternativos
+import streamlit as st
+BRAPI_TOKEN = st.secrets.get("BRAPI_TOKEN", "iExnKM1xcbQcYL3cNPhPQ3")  # Token gratuito da BRAPI
+
+# =============================================================================
+# FUNÇÕES DE BUSCA E TRADUÇÃO DE NOTÍCIAS
+# =============================================================================
 
 def _limpar_html(texto):
     """Remove tags HTML e decodifica entidades."""
@@ -21,7 +41,6 @@ def _limpar_html(texto):
     texto = re.sub(r'<[^>]+>', '', texto)
     texto = html_lib.unescape(texto)
     return texto.strip()
-
 
 def _formatar_data(pub_raw):
     """Converte data RSS -> (str formatada dd/mm/aa HH:MM, datetime UTC para ordenação)."""
@@ -435,6 +454,49 @@ def buscar_noticias_com_traducao(ticker_us, empresa_nome=''):
     return unicas
 
 
+def _renderizar_card_noticia(noticia):
+    titulo     = noticia.get('titulo', '')
+    link       = noticia.get('link', '#')
+    data       = noticia.get('data', '')
+    desc       = noticia.get('descricao', '')
+    fonte      = noticia.get('fonte', '')
+    fonte_real = noticia.get('fonte_real', '')
+    cores = {
+        'Yahoo Finance': ('#eff6ff','#1d4ed8','#dbeafe','📊'),
+        'Google News'  : ('#f0f9ff','#0369a1','#e0f2fe','🌐'),
+        'Seeking Alpha': ('#f0fdf4','#15803d','#dcfce7','📈'),
+        'GuruFocus'    : ('#fefce8','#854d0e','#fef9c3','🧙'),
+        'MarketWatch'  : ('#fdf2f8','#9d174d','#fce7f3','📺'),
+        'Finviz'       : ('#fdf4ff','#7e22ce','#f3e8ff','🔍'),
+    }
+    bg, cor, badge_bg, icone = cores.get(fonte, ('#f8fafc','#475569','#e2e8f0','📰'))
+    label_fonte = (f"{icone} {fonte_real}"
+                   if fonte_real and fonte == 'Google News' and fonte_real != 'Google News'
+                   else f"{icone} {fonte}")
+    desc_html = (
+        f"<p style='margin:0.3rem 0 0;font-size:0.78rem;color:#64748b;"
+        f"line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;"
+        f"-webkit-box-orient:vertical;overflow:hidden;'>{desc}</p>"
+    ) if desc else ""
+    return f"""
+    <div style='background:{bg};border:1px solid {badge_bg};border-left:3px solid {cor};
+                border-radius:10px;padding:0.8rem 0.95rem;margin-bottom:0.55rem;'>
+        <div style='display:flex;justify-content:space-between;align-items:center;
+                    gap:0.5rem;margin-bottom:0.2rem;'>
+            <span style='background:{badge_bg};color:{cor};font-size:0.62rem;font-weight:700;
+                         padding:0.1rem 0.45rem;border-radius:999px;
+                         white-space:nowrap;flex-shrink:0;'>{label_fonte}</span>
+            <span style='font-size:0.65rem;color:#94a3b8;white-space:nowrap;'>{data}</span>
+        </div>
+        <a href="{link}" target="_blank"
+           style='font-size:0.86rem;font-weight:700;color:#1e293b;
+                  text-decoration:none;line-height:1.35;display:block;'>{titulo}</a>
+        {desc_html}
+    </div>"""
+
+
+
+    return unicas
 
 
 def _renderizar_card_noticia(noticia):
@@ -480,7 +542,9 @@ def _renderizar_card_noticia(noticia):
         {desc_html}
     </div>"""
 
-
+# =============================================================================
+# MÓDULO DE MACHINE LEARNING — PREVISÃO DE PREÇOS (ISOLADO)
+# =============================================================================
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _prever_preco_ml_cached(ticker, dias_previsao=5):
@@ -513,6 +577,48 @@ def _prever_preco_ml_cached(ticker, dias_previsao=5):
         return prever_preco_ml(df_raw.dropna(subset=['Close']), ticker, dias_previsao)
     except Exception as e:
         return {'erro': f'Erro no modelo ML: {str(e)}'}
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _executar_agente_rl_cached(ticker, episodes=8, window_size=5):
+    """Wrapper cacheado para executar_agente_rl — evita re-treino a cada interação."""
+    try:
+        import yfinance as yf
+        df_raw = yf.download(f"{ticker}.SA", period='1y', interval='1d',
+                             auto_adjust=True, progress=False, timeout=30)
+        if df_raw is None or df_raw.empty:
+            return {'erro': 'Sem dados para o agente RL.'}
+        if isinstance(df_raw.columns, pd.MultiIndex):
+            df_raw.columns = df_raw.columns.get_level_values(0)
+        close = df_raw['Close'].dropna()
+        df_raw['EMA20'] = close.ewm(span=20).mean()
+        df_raw['RSI14'] = 50.0   # placeholder — RL usa só Close
+        return executar_agente_rl(df_raw.dropna(subset=['Close']), ticker, episodes, window_size)
+    except Exception as e:
+        return {'erro': f'Erro no agente RL: {str(e)}'}
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _calcular_minervini_cached(ticker):
+    """Wrapper cacheado para calcular_minervini."""
+    try:
+        import yfinance as yf
+        df_raw = yf.download(f"{ticker}.SA", period='1y', interval='1d',
+                             auto_adjust=True, progress=False, timeout=30)
+        if df_raw is None or df_raw.empty:
+            return {'erro': 'Sem dados para análise Minervini.'}
+        if isinstance(df_raw.columns, pd.MultiIndex):
+            df_raw.columns = df_raw.columns.get_level_values(0)
+        close = df_raw['Close'].dropna()
+        df_raw['EMA20']  = close.ewm(span=20).mean()
+        df_raw['RSI14']  = 50.0
+        df_raw['Stoch_K']= 50.0
+        sma20 = close.rolling(20).mean(); std20 = close.rolling(20).std()
+        df_raw['BB_Lower'] = sma20 - std20*2
+        df_raw['BB_Upper'] = sma20 + std20*2
+        return calcular_minervini(df_raw.dropna(subset=['Close']), ticker)
+    except Exception as e:
+        return {'erro': f'Erro Minervini: {str(e)}'}
 
 
 def prever_preco_ml(df_ticker, ticker, dias_previsao=5):
@@ -1075,27 +1181,23 @@ def renderizar_painel_ml(resultado_ml, ticker, empresa, dias_previsao=5):
             Split temporal 80/20 sem embaralhamento (sem data leakage)
         </div>""", unsafe_allow_html=True)
 
+# =============================================================================
+# REINFORCEMENT LEARNING — AGENTE DE TRADING (Deep Q-Learning simplificado)
+# Inspirado em: "Reinforcement Learning Based Trading Strategy" (Machine Learning
+# for Asset Managers — Marcos Lopez de Prado / Kaggle notebook)
+#
+# Framework sem Keras/TensorFlow — usa apenas NumPy para funcionar no Streamlit Cloud.
+# O agente aprende uma política ε-greedy com Q-Table aproximada por MLP-NumPy:
+#   • Estado  : diferenças de preços numa janela deslizante (window_size=5)
+#   • Ações   : 0=Hold, 1=Buy, 2=Sell
+#   • Recompensa: PnL realizado na venda (sell_price - bought_price)
+#   • Replay  : Experience Replay com mini-batch aleatório (batch_size=32)
+#   • Rede    : 2 camadas ocultas (64→32 neurônios), ativação ReLU, saída linear
+# =============================================================================
 
+import numpy as np
 import random
 from collections import deque
-
-@st.cache_data(ttl=1800, show_spinner=False)
-def _executar_agente_rl_cached(ticker, episodes=8, window_size=5):
-    """Wrapper cacheado para executar_agente_rl — evita re-treino a cada interação."""
-    try:
-        import yfinance as yf
-        df_raw = yf.download(f"{ticker}.SA", period='1y', interval='1d',
-                             auto_adjust=True, progress=False, timeout=30)
-        if df_raw is None or df_raw.empty:
-            return {'erro': 'Sem dados para o agente RL.'}
-        if isinstance(df_raw.columns, pd.MultiIndex):
-            df_raw.columns = df_raw.columns.get_level_values(0)
-        close = df_raw['Close'].dropna()
-        df_raw['EMA20'] = close.ewm(span=20).mean()
-        df_raw['RSI14'] = 50.0   # placeholder — RL usa só Close
-        return executar_agente_rl(df_raw.dropna(subset=['Close']), ticker, episodes, window_size)
-    except Exception as e:
-        return {'erro': f'Erro no agente RL: {str(e)}'}
 
 
 def _sigmoid(x):
@@ -1548,6 +1650,13 @@ def renderizar_painel_rl(resultado_rl, ticker, empresa):
         </div>""", unsafe_allow_html=True)
 
 
+# =============================================================================
+# TRADINGVIEW SCREENER — DADOS EM TEMPO REAL
+# Baseado em: github.com/shner-elmo/TradingView-Screener
+# Acessa a API oficial do TradingView sem web scraping.
+# Retorna 3000+ campos: OHLC, indicadores técnicos, fundamentais, recomendações.
+# Instalação: tradingview-screener (já no requirements.txt via pip)
+# =============================================================================
 
 @st.cache_data(ttl=300, show_spinner=False)
 def buscar_dados_tradingview(ticker_us, ticker_bdr=''):
@@ -1880,6 +1989,9 @@ def buscar_peers_tradingview(setor, ticker_us_excluir, top_n=5):
     except Exception:
         pass
     return peers
+
+
+
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -2297,29 +2409,17 @@ def renderizar_painel_tradingview(dados, ticker_us, empresa, peers=None):
         </div>""", unsafe_allow_html=True)
 
 
-
-@st.cache_data(ttl=1800, show_spinner=False)
-def _calcular_minervini_cached(ticker):
-    """Wrapper cacheado para calcular_minervini."""
-    try:
-        import yfinance as yf
-        df_raw = yf.download(f"{ticker}.SA", period='1y', interval='1d',
-                             auto_adjust=True, progress=False, timeout=30)
-        if df_raw is None or df_raw.empty:
-            return {'erro': 'Sem dados para análise Minervini.'}
-        if isinstance(df_raw.columns, pd.MultiIndex):
-            df_raw.columns = df_raw.columns.get_level_values(0)
-        close = df_raw['Close'].dropna()
-        df_raw['EMA20']  = close.ewm(span=20).mean()
-        df_raw['RSI14']  = 50.0
-        df_raw['Stoch_K']= 50.0
-        sma20 = close.rolling(20).mean(); std20 = close.rolling(20).std()
-        df_raw['BB_Lower'] = sma20 - std20*2
-        df_raw['BB_Upper'] = sma20 + std20*2
-        return calcular_minervini(df_raw.dropna(subset=['Close']), ticker)
-    except Exception as e:
-        return {'erro': f'Erro Minervini: {str(e)}'}
-
+# =============================================================================
+# ANÁLISE DE FASE — METODOLOGIA MINERVINI / STAN WEINSTEIN
+# Baseado em: github.com/camera3tuca/Ryan (Intelligent Stock Screener)
+# Referências: "Trade Like a Stock Market Wizard" — Mark Minervini
+#              "Secrets for Profiting in Bull and Bear Markets" — Stan Weinstein
+#
+# O sistema Ryan implementa o Trend Template de Minervini (8 critérios),
+# classificação de fase em 4 estágios de Weinstein, Relative Strength vs
+# benchmark, e stop loss ATR-based com validação R:R ≥ 2:1.
+# Aqui adaptamos esses conceitos para BDRs (preços em BRL, benchmark = IBOV).
+# =============================================================================
 
 @st.cache_data(ttl=3600)
 def _buscar_ibov():
@@ -2828,6 +2928,10 @@ def renderizar_painel_minervini(resultado, ticker, empresa):
         </div>""", unsafe_allow_html=True)
 
 
+# =============================================================================
+# ESTRATÉGIA TRIPLE SCREEN DE ALEXANDER ELDER
+# Referência: https://hw-br.online/education/triple-screen-strategy-3-steps-to-make-profit/
+# =============================================================================
 
 def analisar_triple_screen(df_ticker):
     """
@@ -3271,11 +3375,9 @@ def renderizar_triple_screen(resultado, ticker, empresa):
                target="_blank" style='color:#0288d1;'>Leia o artigo completo ↗</a>
         </div>""", unsafe_allow_html=True)
 
-
-
-BRAPI_TOKEN = st.secrets.get("BRAPI_TOKEN", "")  # Token gratuito da BRAPI
-
-
+# =============================================================================
+# MAPEAMENTO BDR → TICKER US PARA DADOS FUNDAMENTALISTAS
+# =============================================================================
 BDR_TO_US_MAP = {
     'A1AP34': 'AAP',
     'A1DC34': 'ADC',
@@ -4011,163 +4113,7 @@ BDR_TO_US_MAP = {
     'SMCI34': 'SMCI',
     'SNOW34': 'SNOW',
     'ZS1234': 'ZS',
-    'SPCX34': 'SPCX',
-    'BMIL39': 'BMIL',
-    'E2PA34': 'E2PA',
-    'R2HH34': 'R2HH',
-    'H1LT34': 'H1LT',
-    'E2NT34': 'E2NT',
-    'C1PR34': 'C1PR',
-    'D1EL34': 'D1EL',
-    'BKYY39': 'BKYY',
-    'N1IC34': 'N1IC',
-    'P2OD34': 'P2OD',
-    'P2LN34': 'P2LN',
-    'V2RN34': 'V2RN',
-    'U2NF34': 'U2NF',
-    'E2XE34': 'E2XE',
-    'TEXA34': 'TEXA',
-    'CMCS34': 'CMCS',
-    'G1LL34': 'G1LL',
-    'BIYK39': 'BIYK',
-    'COLO39': 'COLO',
-    'FMSC34': 'FMSC',
-    'BEUW39': 'BEUW',
-    'D1XC34': 'D1XC',
-    'BHDV39': 'BHDV',
-    'D1RI34': 'D1RI',
-    'O1KE34': 'O1KE',
-    'C2HP34': 'C2HP',
-    'BHEW39': 'BHEW',
-    'D2TC34': 'D2TC',
-    'M2AS34': 'M2AS',
-    'S1YM34': 'S1YM',
-    'DLTR34': 'DLTR',
-    'R1LC34': 'R1LC',
-    'TJXC34': 'TJXC',
-    'BKSA39': 'BKSA',
-    'BFNX39': 'BFNX',
-    'HMRN31': 'HMRN',
-    'M1KT34': 'M1KT',
-    'R2RX34': 'R2RX',
-    'BEWT39': 'BEWT',
-    'BFDN39': 'BFDN',
-    'T1CH34': 'T1CH',
-    'HONB34': 'HONB',
-    'N1WL34': 'N1WL',
-    'BIGO39': 'BIGO',
-    'USIG39': 'USIG',
-    'P1HC34': 'P1HC',
-    'BAOK39': 'BAOK',
-    'J2WA34': 'J2WA',
-    'MOTB39': 'MOTB',
-    'W1DA34': 'W1DA',
-    'J1CI34': 'J1CI',
-    'E2NO34': 'E2NO',
-    'J2AZ34': 'J2AZ',
-    'BSUS39': 'BSUS',
-    'QTOP39': 'QTOP',
-    'L1YB34': 'L1YB',
-    'P1NR34': 'P1NR',
-    'BVLU39': 'BVLU',
-    'M1CB34': 'M1CB',
-    'I1HG34': 'I1HG',
-    'D1TE34': 'D1TE',
-    'BMBB39': 'BMBB',
-    'U1LT34': 'U1LT',
-    'K1RC34': 'K1RC',
-    'BBYY34': 'BBYY',
-    'S2TW34': 'S2TW',
-    'INGG34': 'INGG',
-    'P1SA34': 'P1SA',
-    'AIGB34': 'AIGB',
-    'S1MF34': 'S1MF',
-    'BDRI39': 'BDRI',
-    'C1BO34': 'C1BO',
-    'H1EI34': 'H1EI',
-    'JEPI39': 'JEPI',
-    'P1HM34': 'P1HM',
-    'T1EL34': 'T1EL',
-    'F1BH34': 'F1BH',
-    'E1XR34': 'E1XR',
-    'BLPA39': 'BLPA',
-    'T2ND34': 'T2ND',
-    'S2LA34': 'S2LA',
-    'NSAT34': 'NSAT',
-    'M2PT34': 'M2PT',
-    'BIET39': 'BIET',
-    'BIDV39': 'BIDV',
-    'BEMC39': 'BEMC',
-    'BQTC39': 'BQTC',
-    'S1YK34': 'S1YK',
-    'P2CF34': 'P2CF',
-    'H1ST34': 'H1ST',
-    'T1EC34': 'T1EC',
-    'BFCG39': 'BFCG',
-    'BXTC39': 'BXTC',
-    'IBMB34': 'IBMB',
-    'W2EX34': 'W2EX',
-    'BILB34': 'BILB',
-    'BIYC39': 'BIYC',
-    'S2EI34': 'S2EI',
-    'BIYG39': 'BIYG',
-    'BEWQ39': 'BEWQ',
-    'C1NS34': 'C1NS',
-    'S1YF34': 'S1YF',
-    'BFBI39': 'BFBI',
-    'L2RN34': 'L2RN',
-    'SHLD39': 'SHLD',
-    'HSHY34': 'HSHY',
-    'C2PR34': 'C2PR',
-    'E1DI34': 'E1DI',
-    'BFIW39': 'BFIW',
-    'C1RR34': 'C1RR',
-    'W1EC34': 'W1EC',
-    'BTLH39': 'BTLH',
-    'E2LS34': 'E2LS',
-    'J1KH34': 'J1KH',
-    'Z1BH34': 'Z1BH',
-    'D2KS34': 'D2KS',
-    'BIFR39': 'BIFR',
-    'BIWD39': 'BIWD',
-    'C1CI34': 'C1CI',
-    'C1FI34': 'C1FI',
-    'BIEZ39': 'BIEZ',
-    'BEWM39': 'BEWM',
-    'VRTX34': 'VRTX',
-    'METB34': 'METB',
-    'BBMR39': 'BBMR',
-    'W1RB34': 'W1RB',
-    'P1YC34': 'P1YC',
-    'C1TV34': 'C1TV',
-    'BAOM39': 'BAOM',
-    'Z2IT34': 'Z2IT',
-    'L1DO34': 'L1DO',
-    'B1SX34': 'B1SX',
-    'T1DG34': 'T1DG',
-    'B1WA34': 'B1WA',
-    'R2AR34': 'R2AR',
-    'F2VR34': 'F2VR',
-    'COLD34': 'COLD',
-    'D2KN34': 'D2KN',
-    'GOEX39': 'GOEX',
-    'LMTB34': 'LMTB',
-    'BQLT39': 'BQLT',
-    'EDEN39': 'EDEN',
-    'S2MP34': 'S2MP',
-    'S1SL34': 'S1SL',
-    'BIAG39': 'BIAG',
-    'SIMN34': 'SIMN',
-    'E2XP34': 'E2XP',
-    'O1TI34': 'O1TI',
-    'BIXC39': 'BIXC',
-    'E1TR34': 'E1TR',
-    'BEWI39': 'BEWI',
-    'I2ND34': 'I2ND',
-    'L1UL34': 'L1UL',
-    'EPOL39': 'EPOL',
 }
-
 
 def mapear_ticker_us(ticker_bdr):
     """
@@ -4181,7 +4127,6 @@ def mapear_ticker_us(ticker_bdr):
     stripped = ticker_bdr.rstrip('0123456789')
     # Se sobrar dígito no meio, retorna o BDR original (OpenBB pode resolver pelo nome)
     return stripped
-
 
 def calcular_score_fundamentalista(info):
     """
@@ -4303,7 +4248,6 @@ def calcular_score_fundamentalista(info):
 
     return max(0, min(100, score)), detalhes
 
-
 def buscar_dados_brapi(ticker_bdr):
     """
     Busca dados da BDR diretamente na BRAPI (B3)
@@ -4335,7 +4279,6 @@ def buscar_dados_brapi(ticker_bdr):
         }
     except Exception:
         return None
-
 
 def calcular_score_brapi(dados_brapi):
     """
@@ -4381,9 +4324,8 @@ def calcular_score_brapi(dados_brapi):
 
     return max(0, min(100, score)), detalhes
 
-
-FMP_API_KEY = st.secrets.get("FMP_API_KEY", "")
-
+import streamlit as st
+FMP_API_KEY = st.secrets.get("FMP_API_KEY", "tBsRam74Ac6bZRWS3C8HY83C6not17Uh")
 
 def buscar_dados_openbb(ticker_us):
     """
@@ -5187,163 +5129,7 @@ NOMES_BDRS = {
     'SMCI34': 'Super Micro Computer, Inc.',
     'SNOW34': 'Snowflake Inc.',
     'ZS1234': 'Zscaler, Inc.',
-    'SPCX34': 'Empresa/Fundo SPCX34',
-    'BMIL39': 'GLOBAL X MILLENNIAL CONSUMER ETF',
-    'E2PA34': 'Empresa/Fundo E2PA34',
-    'R2HH34': 'Empresa/Fundo R2HH34',
-    'H1LT34': 'Empresa/Fundo H1LT34',
-    'E2NT34': 'Empresa/Fundo E2NT34',
-    'C1PR34': 'Empresa/Fundo C1PR34',
-    'D1EL34': 'Empresa/Fundo D1EL34',
-    'BKYY39': 'FIRST TRUST CLOUD COMPUTING ETF',
-    'N1IC34': 'Empresa/Fundo N1IC34',
-    'P2OD34': 'Empresa/Fundo P2OD34',
-    'P2LN34': 'Empresa/Fundo P2LN34',
-    'V2RN34': 'Empresa/Fundo V2RN34',
-    'U2NF34': 'Empresa/Fundo U2NF34',
-    'E2XE34': 'Empresa/Fundo E2XE34',
-    'TEXA34': 'Empresa/Fundo TEXA34',
-    'CMCS34': 'Empresa/Fundo CMCS34',
-    'G1LL34': 'Empresa/Fundo G1LL34',
-    'BIYK39': 'ISHARES US CONSUMER STAPLES ETF',
-    'COLO39': 'GLOBAL X MSCI COLOMBIA ETF',
-    'FMSC34': 'Empresa/Fundo FMSC34',
-    'BEUW39': 'ISHARES MSCI USA EQUAL WEIGHTED ETF',
-    'D1XC34': 'Empresa/Fundo D1XC34',
-    'BHDV39': 'ISHARES CORE HIGH DIVIDEND ETF',
-    'D1RI34': 'Empresa/Fundo D1RI34',
-    'O1KE34': 'Empresa/Fundo O1KE34',
-    'C2HP34': 'Empresa/Fundo C2HP34',
-    'BHEW39': 'ISHARES CURRENCY HEDGED MSCI JAPAN ETF',
-    'D2TC34': 'Empresa/Fundo D2TC34',
-    'M2AS34': 'Empresa/Fundo M2AS34',
-    'S1YM34': 'Empresa/Fundo S1YM34',
-    'DLTR34': 'Empresa/Fundo DLTR34',
-    'R1LC34': 'Empresa/Fundo R1LC34',
-    'TJXC34': 'Empresa/Fundo TJXC34',
-    'BKSA39': 'ISHARES MSCI SAUDI ARABIA ETF',
-    'BFNX39': 'GLOBAL X FINTECH ETF',
-    'HMRN31': 'HOMERUN RESOURCES INC',
-    'M1KT34': 'Empresa/Fundo M1KT34',
-    'R2RX34': 'Empresa/Fundo R2RX34',
-    'BEWT39': 'ISHARES MSCI TAIWAN ETF',
-    'BFDN39': 'FIRST TRUST DOW JONES INTERNET INDEX FUND',
-    'T1CH34': 'Empresa/Fundo T1CH34',
-    'HONB34': 'Empresa/Fundo HONB34',
-    'N1WL34': 'Empresa/Fundo N1WL34',
-    'BIGO39': 'ISHARES INTERNATIONAL TREASURY BOND ETF',
-    'USIG39': 'ISHARES BROAD USD INVESTMENT GRADE CORP BOND ETF',
-    'P1HC34': 'Empresa/Fundo P1HC34',
-    'BAOK39': 'ISHARES CORE 30/70 CONSERVATIVE ALLOCATION ETF',
-    'J2WA34': 'Empresa/Fundo J2WA34',
-    'MOTB39': 'VANECK MORNINGSTAR WIDE MOAT ETF',
-    'W1DA34': 'Empresa/Fundo W1DA34',
-    'J1CI34': 'Empresa/Fundo J1CI34',
-    'E2NO34': 'Empresa/Fundo E2NO34',
-    'J2AZ34': 'Empresa/Fundo J2AZ34',
-    'BSUS39': 'ISHARES ESG MSCI USA LEADERS ETF',
-    'QTOP39': 'ISHARES NASDAQ TOP 30 STOCKS ETF',
-    'L1YB34': 'Empresa/Fundo L1YB34',
-    'P1NR34': 'Empresa/Fundo P1NR34',
-    'BVLU39': 'ISHARES MSCI USA VALUE FACTOR ETF',
-    'M1CB34': 'Empresa/Fundo M1CB34',
-    'I1HG34': 'Empresa/Fundo I1HG34',
-    'D1TE34': 'Empresa/Fundo D1TE34',
-    'BMBB39': 'ISHARES MBS ETF',
-    'U1LT34': 'Empresa/Fundo U1LT34',
-    'K1RC34': 'Empresa/Fundo K1RC34',
-    'BBYY34': 'Empresa/Fundo BBYY34',
-    'S2TW34': 'Empresa/Fundo S2TW34',
-    'INGG34': 'Empresa/Fundo INGG34',
-    'P1SA34': 'Empresa/Fundo P1SA34',
-    'AIGB34': 'Empresa/Fundo AIGB34',
-    'S1MF34': 'Empresa/Fundo S1MF34',
-    'BDRI39': 'GLOBAL X AUTONOMOUS & ELECTRIC VEHICLES ETF',
-    'C1BO34': 'Empresa/Fundo C1BO34',
-    'H1EI34': 'Empresa/Fundo H1EI34',
-    'JEPI39': 'JPMORGAN EQUITY PREMIUM INCOME ETF',
-    'P1HM34': 'Empresa/Fundo P1HM34',
-    'T1EL34': 'Empresa/Fundo T1EL34',
-    'F1BH34': 'Empresa/Fundo F1BH34',
-    'E1XR34': 'Empresa/Fundo E1XR34',
-    'BLPA39': 'GLOBAL X MLP ETF',
-    'T2ND34': 'Empresa/Fundo T2ND34',
-    'S2LA34': 'Empresa/Fundo S2LA34',
-    'NSAT34': 'Empresa/Fundo NSAT34',
-    'M2PT34': 'Empresa/Fundo M2PT34',
-    'BIET39': 'ISHARES EXPANDED TECH-SOFTWARE SECTOR ETF',
-    'BIDV39': 'ISHARES INTERNATIONAL SELECT DIVIDEND ETF',
-    'BEMC39': 'ISHARES MSCI EMERGING MARKETS EX CHINA ETF',
-    'BQTC39': 'FIRST TRUST NASDAQ-100-TECHNOLOGY SECTOR INDEX',
-    'S1YK34': 'Empresa/Fundo S1YK34',
-    'P2CF34': 'Empresa/Fundo P2CF34',
-    'H1ST34': 'Empresa/Fundo H1ST34',
-    'T1EC34': 'Empresa/Fundo T1EC34',
-    'BFCG39': 'FIRST TRUST NATURAL GAS ETF',
-    'BXTC39': 'ISHARES FUTURE EXPONENTIAL TECHNOLOGIES ETF',
-    'IBMB34': 'Empresa/Fundo IBMB34',
-    'W2EX34': 'Empresa/Fundo W2EX34',
-    'BILB34': 'Empresa/Fundo BILB34',
-    'BIYC39': 'ISHARES US CONSUMER DISCRETIONARY ETF',
-    'S2EI34': 'Empresa/Fundo S2EI34',
-    'BIYG39': 'ISHARES U.S. FINANCIAL SERVICES ETF',
-    'BEWQ39': 'ISHARES MSCI FRANCE ETF',
-    'C1NS34': 'Empresa/Fundo C1NS34',
-    'S1YF34': 'Empresa/Fundo S1YF34',
-    'BFBI39': 'FIRST TRUST NYSE ARCA BIOTECHNOLOGY INDEX FUND',
-    'L2RN34': 'Empresa/Fundo L2RN34',
-    'SHLD39': 'GLOBAL X DEFENSE TECH ETF',
-    'HSHY34': 'Empresa/Fundo HSHY34',
-    'C2PR34': 'Empresa/Fundo C2PR34',
-    'E1DI34': 'Empresa/Fundo E1DI34',
-    'BFIW39': 'FIRST TRUST WATER ETF',
-    'C1RR34': 'Empresa/Fundo C1RR34',
-    'W1EC34': 'Empresa/Fundo W1EC34',
-    'BTLH39': 'ISHARES 10-20 YEAR TREASURY BOND ETF',
-    'E2LS34': 'Empresa/Fundo E2LS34',
-    'J1KH34': 'Empresa/Fundo J1KH34',
-    'Z1BH34': 'Empresa/Fundo Z1BH34',
-    'D2KS34': 'Empresa/Fundo D2KS34',
-    'BIFR39': 'ISHARES US INFRASTRUCTURE ETF',
-    'BIWD39': 'ISHARES RUSSELL 1000 VALUE ETF',
-    'C1CI34': 'Empresa/Fundo C1CI34',
-    'C1FI34': 'Empresa/Fundo C1FI34',
-    'BIEZ39': 'ISHARES U.S. OIL EQUIPMENT & SERVICES ETF',
-    'BEWM39': 'ISHARES MSCI MALAYSIA ETF',
-    'VRTX34': 'Empresa/Fundo VRTX34',
-    'METB34': 'Empresa/Fundo METB34',
-    'BBMR39': 'JPMORGAN BETABUILDERS MSCI US REIT ETF',
-    'W1RB34': 'Empresa/Fundo W1RB34',
-    'P1YC34': 'Empresa/Fundo P1YC34',
-    'C1TV34': 'Empresa/Fundo C1TV34',
-    'BAOM39': 'ISHARES CORE 40/60 MODERATE ALLOCATION ETF',
-    'Z2IT34': 'Empresa/Fundo Z2IT34',
-    'L1DO34': 'Empresa/Fundo L1DO34',
-    'B1SX34': 'Empresa/Fundo B1SX34',
-    'T1DG34': 'Empresa/Fundo T1DG34',
-    'B1WA34': 'Empresa/Fundo B1WA34',
-    'R2AR34': 'Empresa/Fundo R2AR34',
-    'F2VR34': 'Empresa/Fundo F2VR34',
-    'COLD34': 'Empresa/Fundo COLD34',
-    'D2KN34': 'Empresa/Fundo D2KN34',
-    'GOEX39': 'GLOBAL X GOLD EXPLORERS ETF',
-    'LMTB34': 'Empresa/Fundo LMTB34',
-    'BQLT39': 'ISHARES AAA - A RATED CORPORATE BOND ETF',
-    'EDEN39': 'ISHARES MSCI DENMARK ETF',
-    'S2MP34': 'Empresa/Fundo S2MP34',
-    'S1SL34': 'Empresa/Fundo S1SL34',
-    'BIAG39': 'ISHARES CORE INTERNATIONAL AGGREGATE BOND ETF',
-    'SIMN34': 'Empresa/Fundo SIMN34',
-    'E2XP34': 'Empresa/Fundo E2XP34',
-    'O1TI34': 'Empresa/Fundo O1TI34',
-    'BIXC39': 'ISHARES GLOBAL ENERGY ETF',
-    'E1TR34': 'Empresa/Fundo E1TR34',
-    'BEWI39': 'ISHARES MSCI ITALY ETF',
-    'I2ND34': 'Empresa/Fundo I2ND34',
-    'L1UL34': 'Empresa/Fundo L1UL34',
-    'EPOL39': 'ISHARES MSCI POLAND ETF',
 }
-
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def buscar_dados_fundamentalistas(ticker_bdr):
@@ -5548,10 +5334,9 @@ def buscar_dados_fundamentalistas(ticker_bdr):
 
     return None
 
+# Dicionário de nomes de BDRs (677 empresas - atualizado em 2026-02-06)
 
-
-PERIODO = "1y"  # 1 ano para ter dados suficientes para EMA200 (~252 dias úteis)
-
+# --- FUNÇÕES ---
 
 @st.cache_data(ttl=1800)
 def buscar_dados(tickers):
@@ -5563,27 +5348,8 @@ def buscar_dados(tickers):
         if df.empty: return pd.DataFrame()
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = pd.MultiIndex.from_tuples([(c[0], c[1].replace(".SA", "")) for c in df.columns])
-
-        df = df.dropna(axis=1, how='all')
-
-        # Preencher dados faltantes para BDRs ilíquidas
-        idx = pd.IndexSlice
-        if isinstance(df.columns, pd.MultiIndex):
-            for col in ['Close', 'High', 'Low', 'Open']:
-                if col in df.columns.levels[0]:
-                    df.loc[:, idx[col, :]] = df.loc[:, idx[col, :]].ffill()
-            if 'Volume' in df.columns.levels[0]:
-                df.loc[:, idx['Volume', :]] = df.loc[:, idx['Volume', :]].fillna(0)
-        else:
-            for col in ['Close', 'High', 'Low', 'Open']:
-                if col in df.columns:
-                    df[col] = df[col].ffill()
-            if 'Volume' in df.columns:
-                df['Volume'] = df['Volume'].fillna(0)
-
-        return df
+        return df.dropna(axis=1, how='all')
     except Exception: return pd.DataFrame()
-
 
 @st.cache_data(ttl=1800)
 def buscar_dados_horario(ticker):
@@ -5636,7 +5402,6 @@ def buscar_dados_horario(ticker):
         return None
 
 
-def buscar_nomes_yahoo(tickers):
     """Busca os nomes das empresas diretamente do Yahoo Finance"""
     mapa_nomes = {}
 
@@ -5669,7 +5434,6 @@ def buscar_nomes_yahoo(tickers):
         progresso_nomes.empty()
 
     return mapa_nomes
-
 
 def calcular_indicadores(df):
     df_calc = df.copy()
@@ -5718,7 +5482,6 @@ def calcular_indicadores(df):
     progresso.empty()
     return df_calc
 
-
 def calcular_fibonacci(df_ticker):
     try:
         if len(df_ticker) < 50: return None
@@ -5727,7 +5490,6 @@ def calcular_fibonacci(df_ticker):
         diff = high - low
         return {'61.8%': low + (diff * 0.618)}
     except: return None
-
 
 def gerar_sinal(row_ticker, df_ticker):
     sinais = []
@@ -5788,52 +5550,6 @@ def gerar_sinal(row_ticker, df_ticker):
         return sinais, score, classificar(score), explicacoes
     except:
         return [], 0, "Indefinida", []
-
-
-def _eh_etf_ticker(ticker):
-    """Identifica se um ticker BDR corresponde a um ETF (terminação '39')."""
-    return str(ticker).strip().upper().endswith('39')
-
-
-def _gerar_nome_curto(ticker, nome_completo):
-    """
-    Gera um nome curto e diferenciado para exibição na tabela.
-
-    Para ETFs (terminação '39'), o padrão "iShares MSCI X", "iShares Core Y",
-    "Global X Z" etc. faz com que cortar para 2 palavras gere nomes
-    repetidos e genéricos (ex.: "Ishares Msci" para várias linhas).
-    Nesses casos, usamos mais palavras (até 4) para manter a parte
-    diferenciadora do nome (país/região/tema do fundo).
-
-    Para ações normais, mantém o comportamento original (2 palavras úteis).
-    """
-    if nome_completo == ticker:
-        return ticker
-
-    ignore_list = ['INC', 'CORP', 'LTD', 'S.A.', 'GMBH', 'PLC', 'GROUP',
-                    'HOLDINGS', 'CO', 'LLC']
-    palavras = nome_completo.split()
-    palavras_uteis = [p for p in palavras
-                      if p.upper().replace('.', '').replace(',', '') not in ignore_list]
-
-    if not palavras_uteis:
-        return nome_completo.replace(',', '').title()
-
-    if _eh_etf_ticker(ticker):
-        # Para ETFs, mantém mais palavras para preservar o diferencial
-        # (ex.: "iShares MSCI Brazil ETF" -> "Ishares Msci Brazil")
-        n_palavras = min(4, len(palavras_uteis))
-        # Remove o sufixo genérico "ETF"/"Fund"/"Trust" do final, se sobrar espaço
-        candidatos = [p for p in palavras_uteis
-                      if p.upper() not in ('ETF', 'FUND', 'TRUST')]
-        if len(candidatos) >= 2:
-            palavras_uteis = candidatos
-        nome_curto = " ".join(palavras_uteis[:n_palavras])
-    else:
-        nome_curto = " ".join(palavras_uteis[:2])
-
-    return nome_curto.replace(',', '').title()
-
 
 def analisar_oportunidades(df_calc, mapa_nomes):
     resultados = []
@@ -5915,7 +5631,23 @@ def analisar_oportunidades(df_calc, mapa_nomes):
 
             # Tratamento de Nome
             nome_completo = mapa_nomes.get(ticker, ticker)
-            nome_curto = _gerar_nome_curto(ticker, nome_completo)
+
+            # Se o nome completo for igual ao ticker, significa que não conseguimos o nome real
+            if nome_completo == ticker:
+                # Usar o ticker sem processar
+                nome_curto = ticker
+            else:
+                # Processar o nome normalmente
+                palavras = nome_completo.split()
+                ignore_list = ['INC', 'CORP', 'LTD', 'S.A.', 'GMBH', 'PLC', 'GROUP', 'HOLDINGS', 'CO', 'LLC']
+                palavras_uteis = [p for p in palavras if p.upper().replace('.', '').replace(',', '') not in ignore_list]
+
+                if len(palavras_uteis) > 0:
+                    nome_curto = " ".join(palavras_uteis[:2])
+                else:
+                    nome_curto = nome_completo
+
+                nome_curto = nome_curto.replace(',', '').title()
 
             resultados.append({
                 'Ticker': ticker,
@@ -5935,7 +5667,6 @@ def analisar_oportunidades(df_calc, mapa_nomes):
             })
         except: continue
     return resultados
-
 
 def plotar_grafico(df_ticker, ticker, empresa, rsi, is_val,
                    timeframe='Diário', zoom_periods=None, tipo_grafico='Linha',
@@ -6227,13 +5958,11 @@ def plotar_grafico(df_ticker, ticker, empresa, rsi, is_val,
     fig.subplots_adjust(bottom=0.13)
     return fig
 
-
-
+# Estilização
 def estilizar_is(val):
     if val >= 75: return 'background-color: #d32f2f; color: white; font-weight: bold'
     elif val >= 60: return 'background-color: #ffa726; color: black'
     else: return 'color: #888888'
-
 
 def estilizar_potencial(val):
     if val == 'Muito Alta': return 'background-color: #2e7d32; color: white; font-weight: bold'
@@ -6241,7 +5970,6 @@ def estilizar_potencial(val):
     elif val == 'Média': return 'background-color: #ffa726; color: black'
     elif val == 'Baixa': return 'background-color: #e0e0e0; color: black'
     return ''
-
 
 def estilizar_liquidez(val):
     """Degradê vermelho→amarelo→verde para ranking 0-10"""
@@ -6266,7 +5994,6 @@ def estilizar_liquidez(val):
     return (f'background-color: {bg}; color: {fg}; '
             f'font-weight: 900; font-size: 1.1em; text-align: center;')
 
-
 def estilizar_fundamentalista(val):
     """Estilo para classificação fundamentalista"""
     cores = {
@@ -6281,611 +6008,9 @@ def estilizar_fundamentalista(val):
     return (f'background-color: {bg}; color: {fg}; '
             f'font-weight: 900; font-size: 1.2em; text-align: center;')
 
+# --- LAYOUT DO APP ---
 
-
-
-
-def eh_etf(ticker_bdr):
-    """
-    Identifica se um ticker BDR corresponde a um ETF.
-    Regra: BDRs de ETF na B3 terminam em '39'.
-    """
-    return str(ticker_bdr).strip().upper().endswith('39')
-
-
-# ──────────────────────────────────────────────────────────────────────────
-# MAPA DE CORREÇÃO — BDR de ETF -> ticker REAL do fundo no Yahoo Finance
-# ──────────────────────────────────────────────────────────────────────────
-# O BDR_TO_US_MAP em fundamentals.py foi gerado de forma heurística e, para
-# vários ETFs (terminação 39), o ticker resultante não corresponde ao
-# símbolo real do fundo no Yahoo (ex.: BUSM39 -> 'BUSM', que não existe;
-# o fundo correto é o iShares MSCI USA Min Vol Factor ETF = 'USMV').
-#
-# Este mapa cobre os casos conhecidos de divergência. Quando o ticker BDR
-# não estiver aqui, o código tenta o mapeamento padrão e, em seguida,
-# busca pelo NOME do fundo via yf.Search como fallback.
-ETF_TICKER_CORRECAO = {
-    'AADA39': 'EZA',     # 21Shares / South Africa ETP (aprox.)
-    'ABGD39': 'AGGY',    # abrdn Gold ETF Trust (aprox. — pode variar)
-    'ACWX39': 'ACWX',
-    'ARGT39': 'ARGT',
-    'BACW39': 'ACWI',
-    'BAER39': 'ITA',
-    'BAGG39': 'AGG',
-    'BAOR39': 'AOR',
-    'BARY39': 'IRBO',
-    'BASK39': 'BASK',
-    'BBJP39': 'BBJP',
-    'BBUG39': 'BUG',
-    'BCAT39': 'SPCX',
-    'BCHI39': 'MCHI',
-    'BCIR39': 'CIBR',
-    'BCLO39': 'CLOU',
-    'BCNY39': 'CNYA',
-    'BCOM39': 'COMB',
-    'BCPX39': 'COPX',
-    'BCTE39': 'CTEC',
-    'BCWV39': 'ACWV',
-    'BDVD39': 'SDIV',
-    'BDVE39': 'DVYE',
-    'BDVY39': 'DVY',
-    'BECH39': 'ECH',
-    'BEEM39': 'EEM',
-    'BEFA39': 'EFA',
-    'BEFG39': 'EFG',
-    'BEFV39': 'EFV',
-    'BEGD39': 'ESGD',
-    'BEGE39': 'ESGE',
-    'BEGU39': 'ESGU',
-    'BEIS39': 'EIS',
-    'BEMV39': 'EEMV',
-    'BEPP39': 'IPAC',
-    'BEPU39': 'EPU',
-    'BEWA39': 'EWA',
-    'BEWC39': 'EWC',
-    'BEWD39': 'EWD',
-    'BEWG39': 'EWG',
-    'BEWH39': 'EWH',
-    'BEWJ39': 'EWJ',
-    'BEWL39': 'EWL',
-    'BEWP39': 'EWP',
-    'BEWS39': 'EWS',
-    'BEWW39': 'EWW',
-    'BEWY39': 'EWY',
-    'BEWZ39': 'EWZ',
-    'BEZA39': 'EZA',
-    'BEZU39': 'EZU',
-    'BFAV39': 'EFAV',
-    'BFLO39': 'FLOT',
-    'BFXI39': 'FXI',
-    'BGLC39': 'IOO',
-    'BGOV39': 'GOVT',
-    'BGOZ39': 'GOVZ',
-    'BGRT39': 'REET',
-    'BGWH39': 'DGRO',
-    'BHEF39': 'HEFA',
-    'BHER39': 'HERO',
-    'BHYC39': 'SHYG',
-    'BHYG39': 'HYG',
-    'BIAI39': 'IAI',
-    'BIAU39': 'IAU',
-    'BIBB39': 'IBB',
-    'BICL39': 'ICLN',
-    'BICI39': 'IBIT',
-    'BIEF39': 'IEFA',
-    'BIEI39': 'IEI',
-    'BIEM39': 'IEMG',
-    'BIEO39': 'IEO',
-    'BIEU39': 'IEUR',
-    'BIEV39': 'IEV',
-    'BIGF39': 'IGF',
-    'BIGS39': 'IGSB',
-    'BIHE39': 'IHE',
-    'BIHF39': 'IHF',
-    'BIHI39': 'IHI',
-    'BIJH39': 'IJH',
-    'BIJR39': 'IJR',
-    'BIJS39': 'IJS',
-    'BIJT39': 'IJT',
-    'BILF39': 'ILF',
-    'BIPC39': 'IPAC',
-    'BITB39': 'ITB',
-    'BITO39': 'ITOT',
-    'BIUS39': 'IUSB',
-    'BIVB39': 'IVV',
-    'BIVE39': 'IVE',
-    'BIVW39': 'IVW',
-    'BIWF39': 'IWF',
-    'BIWM39': 'IWM',
-    'BIXG39': 'IXG',
-    'BIXJ39': 'IXJ',
-    'BIXN39': 'IXN',
-    'BIXU39': 'IXUS',
-    'BIYE39': 'IYE',
-    'BIYF39': 'IYF',
-    'BIYJ39': 'IYJ',
-    'BIYT39': 'IEF',
-    'BIYW39': 'IYW',
-    'BIYZ39': 'IYZ',
-    'BJQU39': 'JQUA',
-    'BKCH39': 'BLOK',
-    'BKWB39': 'KWEB',
-    'BKXI39': 'KXI',
-    'BLBT39': 'LIT',
-    'BLPX39': 'MLPA',
-    'BLQD39': 'LQD',
-    'BMTU39': 'MTUM',
-    'BNDA39': 'INDA',
-    'BOEF39': 'OEF',
-    'BOTZ39': 'BOTZ',
-    'BPIC39': 'PICK',
-    'BPVE39': 'PAVE',
-    'BQQW39': 'QQEW',
-    'BQUA39': 'QUAL',
-    'BQYL39': 'QYLD',
-    'BSCZ39': 'SCZ',
-    'BSDV39': 'DIV',
-    'BSHV39': 'SHV',
-    'BSHY39': 'SHY',
-    'BSIL39': 'SIL',
-    'BSIZ39': 'SIZE',
-    'BSLV39': 'SLV',
-    'BSOC39': 'SOCL',
-    'BSOX39': 'SOXX',
-    'BSRE39': 'SRET',
-    'BTFL39': 'TFLO',
-    'BTIP39': 'TIP',
-    'BTLT39': 'TLT',
-    'BURA39': 'URA',
-    'BURT39': 'URTH',
-    'BUSM39': 'USMV',
-    'BUSR39': 'USRT',
-    'BUTL39': 'IDU',
-    'CRYP39': 'BLOK',
-    'DOLL39': 'BIL',
-    'DTCR39': 'IDGT',
-    'EIDO39': 'EIDO',
-    'EPHE39': 'EPHE',
-    'ETHA39': 'ETHA',
-    'EWJV39': 'EWJV',
-    'GDXB39': 'GDX',
-    'HYEM39': 'HYEM',
-    'RSSL39': 'IWM',
-    'SIVR39': 'SIVR',
-    'SLXB39': 'SLX',
-    'SMIN39': 'SMIN',
-    'SOLN39': 'SGOL',
-    'TBIL39': 'BIL',
-    'TOPB39': 'OEF',
-    'AETH39': 'ETHA',
-    'ANGV39': 'ANGL',
-    'AXRP39': 'XRP',
-}
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def buscar_dados_etf(ticker_bdr):
-    """
-    Busca dados detalhados do ETF correspondente via yfinance.
-
-    Estratégia de fallback em cascata:
-      1. Ticker corrigido manualmente (ETF_TICKER_CORRECAO), quando existe.
-      2. Ticker US mapeado (BDR_TO_US_MAP) via mapear_ticker_us.
-      3. Ticker BDR sem o sufixo numérico (fallback genérico).
-      4. Busca pelo NOME do fundo (NOMES_BDRS) via yf.Search — útil quando
-         nenhum dos tickers acima é válido no Yahoo.
-
-    Retorna dict com:
-        erro
-        ticker_fonte
-        nome
-        categoria
-        familia_fundo
-        patrimonio (totalAssets)
-        expense_ratio
-        ytd_return
-        yield_div
-        nav
-        preco
-        variacao_dia
-        volume
-        beta
-        max_52s, min_52s
-        top_holdings: list[{'symbol','name','pct'}]
-        setores: list[{'setor','pct'}]
-        descricao
-    """
-    ticker_bdr = str(ticker_bdr).strip().upper()
-    ticker_us  = mapear_ticker_us(ticker_bdr)
-
-    candidatos = []
-
-    # 1. Correção manual conhecida
-    if ticker_bdr in ETF_TICKER_CORRECAO:
-        candidatos.append(ETF_TICKER_CORRECAO[ticker_bdr])
-
-    # 2. Mapeamento padrão (BDR_TO_US_MAP)
-    if ticker_us and ticker_us != ticker_bdr:
-        candidatos.append(ticker_us)
-
-    # 3. Fallback genérico — remove sufixo numérico
-    stripped = ticker_bdr.rstrip('0123456789')
-    if stripped:
-        candidatos.append(stripped)
-
-    # remove duplicados preservando ordem
-    vistos = set()
-    candidatos = [c for c in candidatos if c and not (c in vistos or vistos.add(c))]
-
-    def _tentar_ticker(tk):
-        """Tenta buscar dados de fundo para um ticker específico."""
-        try:
-            t = yf.Ticker(tk)
-            info = t.info or {}
-            if not info or len(info) < 3:
-                return None
-
-            quote_type = (info.get('quoteType') or '').upper()
-            tem_campos_fundo = any([
-                info.get('totalAssets'),
-                info.get('fundFamily'),
-                info.get('category'),
-                info.get('navPrice'),
-            ])
-            if quote_type != 'ETF' and not tem_campos_fundo:
-                return None
-
-            return _montar_resultado(t, info, tk)
-        except Exception:
-            return None
-
-    # ── Tentativas 1-3: tickers candidatos diretos ──────────────────────────
-    for tk in candidatos:
-        resultado = _tentar_ticker(tk)
-        if resultado:
-            return resultado
-
-    # ── Tentativa 4: busca pelo nome do fundo via yf.Search ─────────────────
-    try:
-        nome_fundo = NOMES_BDRS.get(ticker_bdr, '')
-        if nome_fundo:
-            # Remove sufixos genéricos que poluem a busca
-            nome_busca = re.sub(
-                r'\b(ETF|ETP|Trust|Fund|Shares?|Sponsored|ADR|ADS)\b',
-                '', nome_fundo, flags=re.IGNORECASE
-            ).strip()
-            if nome_busca:
-                resultado_busca = yf.Search(nome_busca, max_results=8)
-                quotes = resultado_busca.quotes if hasattr(resultado_busca, 'quotes') else []
-                for q in quotes:
-                    tipo = (q.get('quoteType') or '').upper()
-                    symbol = q.get('symbol', '')
-                    if tipo == 'ETF' and symbol and '.' not in symbol:
-                        resultado = _tentar_ticker(symbol)
-                        if resultado:
-                            return resultado
-    except Exception:
-        pass
-
-    return {'erro': f'Não foi possível obter dados de ETF para {ticker_bdr} (US: {ticker_us}).'}
-
-
-def _montar_resultado(t, info, ticker_fonte):
-    """Monta o dicionário padronizado de resposta a partir de um yf.Ticker já validado."""
-
-    # ── Top holdings ──────────────────────────────────────────────────────────
-    top_holdings = []
-    try:
-        hold_df = t.funds_data.top_holdings if hasattr(t, 'funds_data') else None
-        if hold_df is not None and not hold_df.empty:
-            for idx, row in hold_df.head(10).iterrows():
-                top_holdings.append({
-                    'symbol': str(idx),
-                    'name': str(row.get('Name', idx)),
-                    'pct': float(row.get('Holding Percent', 0)) * 100,
-                })
-    except Exception:
-        pass
-
-    # ── Setores ───────────────────────────────────────────────────────────────
-    setores = []
-    try:
-        sec_weights = t.funds_data.sector_weightings if hasattr(t, 'funds_data') else None
-        if sec_weights:
-            nomes_pt = {
-                'realestate': 'Imóveis', 'consumer_cyclical': 'Consumo Cíclico',
-                'basic_materials': 'Materiais Básicos', 'consumer_defensive': 'Consumo Defensivo',
-                'technology': 'Tecnologia', 'communication_services': 'Comunicação',
-                'financial_services': 'Serviços Financeiros', 'utilities': 'Utilidades',
-                'industrials': 'Industrial', 'energy': 'Energia', 'healthcare': 'Saúde',
-            }
-            for setor, peso in sec_weights.items():
-                if peso and peso > 0:
-                    setores.append({
-                        'setor': nomes_pt.get(setor, setor.replace('_', ' ').title()),
-                        'pct': float(peso) * 100,
-                    })
-            setores.sort(key=lambda x: x['pct'], reverse=True)
-    except Exception:
-        pass
-
-    # ── Preço / variação ──────────────────────────────────────────────────────
-    preco = info.get('regularMarketPrice') or info.get('previousClose')
-    preco_ant = info.get('regularMarketPreviousClose') or info.get('previousClose')
-    variacao_dia = None
-    if preco and preco_ant and preco_ant != 0:
-        variacao_dia = (preco - preco_ant) / preco_ant * 100
-
-    # ── Expense ratio ─────────────────────────────────────────────────────────
-    expense_ratio = info.get('netExpenseRatio') or info.get('annualReportExpenseRatio')
-    if expense_ratio and expense_ratio < 1:
-        expense_ratio = expense_ratio * 100
-
-    # ── YTD return ────────────────────────────────────────────────────────────
-    ytd = info.get('ytdReturn')
-    if ytd is not None:
-        ytd = ytd * 100
-
-    return {
-        'erro': None,
-        'ticker_fonte': ticker_fonte,
-        'nome': info.get('longName') or info.get('shortName') or ticker_fonte,
-        'categoria': info.get('category', 'N/A'),
-        'familia_fundo': info.get('fundFamily', 'N/A'),
-        'patrimonio': info.get('totalAssets'),
-        'expense_ratio': expense_ratio,
-        'ytd_return': ytd,
-        'yield_div': (info.get('yield') * 100) if info.get('yield') else None,
-        'nav': info.get('navPrice'),
-        'preco': preco,
-        'variacao_dia': variacao_dia,
-        'volume': info.get('regularMarketVolume') or info.get('volume'),
-        'beta': info.get('beta3Year') or info.get('beta'),
-        'max_52s': info.get('fiftyTwoWeekHigh'),
-        'min_52s': info.get('fiftyTwoWeekLow'),
-        'top_holdings': top_holdings,
-        'setores': setores,
-        'descricao': info.get('longBusinessSummary', ''),
-    }
-
-
-def renderizar_painel_etf(dados, ticker_bdr, empresa):
-    """Renderiza o painel detalhado da ETF dentro de um st.expander."""
-    with st.expander("🧺 Detalhes da ETF — Composição, Setores & Métricas de Fundo", expanded=True):
-
-        if dados.get('erro'):
-            st.warning(f"⚠️ {dados['erro']}")
-            st.caption("Algumas ETFs não disponibilizam dados completos via Yahoo Finance.")
-            return
-
-        nome          = dados.get('nome', ticker_bdr)
-        ticker_fonte  = dados.get('ticker_fonte', ticker_bdr)
-        categoria     = dados.get('categoria') or 'N/A'
-        familia       = dados.get('familia_fundo') or 'N/A'
-        patrimonio    = dados.get('patrimonio')
-        expense_ratio = dados.get('expense_ratio')
-        ytd           = dados.get('ytd_return')
-        yield_div     = dados.get('yield_div')
-        nav           = dados.get('nav')
-        preco         = dados.get('preco')
-        variacao_dia  = dados.get('variacao_dia')
-        volume        = dados.get('volume')
-        beta          = dados.get('beta')
-        max_52s       = dados.get('max_52s')
-        min_52s       = dados.get('min_52s')
-        top_holdings  = dados.get('top_holdings') or []
-        setores       = dados.get('setores') or []
-        descricao     = dados.get('descricao', '')
-
-        # ── Cabeçalho ─────────────────────────────────────────────────────────
-        st.markdown(f"""
-        <div style='background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);
-                    padding:1rem 1.4rem;border-radius:12px;margin-bottom:1rem;'>
-            <div style='display:flex;align-items:center;gap:0.8rem;margin-bottom:0.4rem;'>
-                <span style='font-size:1.8rem;'>🧺</span>
-                <div>
-                    <div style='color:#93c5fd;font-weight:800;font-size:1rem;'>
-                        {nome}</div>
-                    <div style='color:#bfdbfe;font-size:0.78rem;'>
-                        {ticker_bdr} (B3) · {ticker_fonte} (Fundo) · {familia}</div>
-                </div>
-            </div>
-            <p style='margin:0;color:#bfdbfe;font-size:0.78rem;'>
-                📂 <strong style='color:#93c5fd;'>Categoria:</strong> {categoria}
-            </p>
-        </div>""", unsafe_allow_html=True)
-
-        # ── Cards principais ─────────────────────────────────────────────────
-        c1, c2, c3, c4 = st.columns(4)
-
-        with c1:
-            if preco:
-                sinal = '+' if (variacao_dia or 0) >= 0 else ''
-                cor_v = '#15803d' if (variacao_dia or 0) >= 0 else '#b91c1c'
-                var_str = f"{sinal}{variacao_dia:.2f}%" if variacao_dia is not None else 'N/A'
-                st.markdown(f"""
-                <div style='background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;
-                            padding:0.85rem;text-align:center;min-height:105px;
-                            display:flex;flex-direction:column;justify-content:center;'>
-                    <div style='font-size:0.65rem;font-weight:700;color:#94a3b8;
-                                text-transform:uppercase;'>Preço (Fundo)</div>
-                    <div style='font-size:1.3rem;font-weight:900;color:#1e293b;'>
-                        ${preco:.2f}</div>
-                    <div style='font-size:0.85rem;font-weight:700;color:{cor_v};'>{var_str}</div>
-                </div>""", unsafe_allow_html=True)
-            else:
-                st.markdown("<div style='text-align:center;color:#94a3b8;'>Preço N/A</div>",
-                            unsafe_allow_html=True)
-
-        with c2:
-            patrimonio_str = 'N/A'
-            if patrimonio:
-                if patrimonio >= 1e9:
-                    patrimonio_str = f"${patrimonio/1e9:.2f}B"
-                else:
-                    patrimonio_str = f"${patrimonio/1e6:.1f}M"
-            st.markdown(f"""
-            <div style='background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;
-                        padding:0.85rem;text-align:center;min-height:105px;
-                        display:flex;flex-direction:column;justify-content:center;'>
-                <div style='font-size:0.65rem;font-weight:700;color:#94a3b8;
-                            text-transform:uppercase;'>Patrimônio (AUM)</div>
-                <div style='font-size:1.3rem;font-weight:900;color:#1e293b;'>
-                    {patrimonio_str}</div>
-                <div style='font-size:0.7rem;color:#94a3b8;'>Total Assets</div>
-            </div>""", unsafe_allow_html=True)
-
-        with c3:
-            er_str = f"{expense_ratio:.2f}%" if expense_ratio is not None else 'N/A'
-            cor_er = '#15803d' if (expense_ratio or 0) < 0.3 else '#b45309' if (expense_ratio or 0) < 0.7 else '#b91c1c'
-            st.markdown(f"""
-            <div style='background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;
-                        padding:0.85rem;text-align:center;min-height:105px;
-                        display:flex;flex-direction:column;justify-content:center;'>
-                <div style='font-size:0.65rem;font-weight:700;color:#94a3b8;
-                            text-transform:uppercase;'>Taxa de Administração</div>
-                <div style='font-size:1.3rem;font-weight:900;color:{cor_er};'>
-                    {er_str}</div>
-                <div style='font-size:0.7rem;color:#94a3b8;'>Expense Ratio (a.a.)</div>
-            </div>""", unsafe_allow_html=True)
-
-        with c4:
-            yield_str = f"{yield_div:.2f}%" if yield_div is not None else 'N/A'
-            ytd_str   = f"{ytd:+.2f}%" if ytd is not None else 'N/A'
-            cor_ytd = '#15803d' if (ytd or 0) >= 0 else '#b91c1c'
-            st.markdown(f"""
-            <div style='background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;
-                        padding:0.85rem;text-align:center;min-height:105px;
-                        display:flex;flex-direction:column;justify-content:center;'>
-                <div style='font-size:0.65rem;font-weight:700;color:#94a3b8;
-                            text-transform:uppercase;'>Yield / YTD</div>
-                <div style='font-size:1.1rem;font-weight:900;color:#1e293b;'>
-                    Yield: {yield_str}</div>
-                <div style='font-size:0.95rem;font-weight:800;color:{cor_ytd};'>
-                    YTD: {ytd_str}</div>
-            </div>""", unsafe_allow_html=True)
-
-        st.markdown("<div style='height:0.8rem'></div>", unsafe_allow_html=True)
-
-        # ── Linha 2: NAV, Volume, Beta, 52 semanas ─────────────────────────────
-        c5, c6, c7, c8 = st.columns(4)
-        with c5:
-            nav_str = f"${nav:.2f}" if nav else 'N/A'
-            st.markdown(f"""
-            <div style='background:#fff;border:1px solid #e2e8f0;border-radius:8px;
-                        padding:0.6rem;text-align:center;'>
-                <div style='font-size:0.6rem;color:#94a3b8;font-weight:700;
-                            text-transform:uppercase;'>NAV</div>
-                <div style='font-size:0.95rem;font-weight:800;color:#1e293b;'>{nav_str}</div>
-            </div>""", unsafe_allow_html=True)
-
-        with c6:
-            vol_str = f"{volume:,.0f}" if volume else 'N/A'
-            st.markdown(f"""
-            <div style='background:#fff;border:1px solid #e2e8f0;border-radius:8px;
-                        padding:0.6rem;text-align:center;'>
-                <div style='font-size:0.6rem;color:#94a3b8;font-weight:700;
-                            text-transform:uppercase;'>Volume</div>
-                <div style='font-size:0.95rem;font-weight:800;color:#1e293b;'>{vol_str}</div>
-            </div>""", unsafe_allow_html=True)
-
-        with c7:
-            beta_str = f"{beta:.2f}" if beta else 'N/A'
-            st.markdown(f"""
-            <div style='background:#fff;border:1px solid #e2e8f0;border-radius:8px;
-                        padding:0.6rem;text-align:center;'>
-                <div style='font-size:0.6rem;color:#94a3b8;font-weight:700;
-                            text-transform:uppercase;'>Beta (3Y)</div>
-                <div style='font-size:0.95rem;font-weight:800;color:#1e293b;'>{beta_str}</div>
-            </div>""", unsafe_allow_html=True)
-
-        with c8:
-            faixa_str = 'N/A'
-            if max_52s and min_52s:
-                faixa_str = f"${min_52s:.2f} – ${max_52s:.2f}"
-            st.markdown(f"""
-            <div style='background:#fff;border:1px solid #e2e8f0;border-radius:8px;
-                        padding:0.6rem;text-align:center;'>
-                <div style='font-size:0.6rem;color:#94a3b8;font-weight:700;
-                            text-transform:uppercase;'>Faixa 52 Semanas</div>
-                <div style='font-size:0.85rem;font-weight:800;color:#1e293b;'>{faixa_str}</div>
-            </div>""", unsafe_allow_html=True)
-
-        st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
-
-        # ── Top Holdings + Setores ────────────────────────────────────────────
-        col_h, col_s = st.columns(2)
-
-        with col_h:
-            st.markdown("**📋 Principais Posições (Top Holdings):**")
-            if top_holdings:
-                df_hold = pd.DataFrame(top_holdings)
-                df_hold = df_hold.rename(columns={'symbol': 'Ticker', 'name': 'Nome', 'pct': '% Carteira'})
-                st.dataframe(
-                    df_hold.style.format({'% Carteira': '{:.2f}%'}),
-                    width="stretch", hide_index=True,
-                    column_config={
-                        "Ticker": st.column_config.TextColumn("Ticker", width="small"),
-                        "Nome": st.column_config.TextColumn("Nome", width="medium"),
-                        "% Carteira": st.column_config.ProgressColumn(
-                            "% Carteira", format="%.2f%%", min_value=0,
-                            max_value=max(h['pct'] for h in top_holdings) if top_holdings else 100),
-                    }
-                )
-            else:
-                st.info("Composição de holdings não disponível para este fundo.")
-
-        with col_s:
-            st.markdown("**🏭 Distribuição por Setor:**")
-            if setores:
-                fig, ax = plt.subplots(figsize=(5, 3.5))
-                setores_top = setores[:8]
-                labels = [s['setor'] for s in setores_top]
-                vals   = [s['pct'] for s in setores_top]
-                cores  = plt.cm.tab20.colors[:len(labels)]
-                ax.barh(labels, vals, color=cores)
-                ax.invert_yaxis()
-                ax.set_xlabel('% da carteira', fontsize=8)
-                for i, v in enumerate(vals):
-                    ax.text(v + 0.3, i, f'{v:.1f}%', va='center', fontsize=7.5)
-                ax.spines['top'].set_visible(False)
-                ax.spines['right'].set_visible(False)
-                plt.tight_layout()
-                st.pyplot(fig)
-                plt.close(fig)
-            else:
-                st.info("Distribuição setorial não disponível para este fundo.")
-
-        # ── Descrição ────────────────────────────────────────────────────────
-        if descricao:
-            with st.expander("📖 Descrição do Fundo", expanded=False):
-                # Limita tamanho para não poluir
-                st.write(descricao[:1500] + ('...' if len(descricao) > 1500 else ''))
-
-        st.markdown("""
-        <div style='margin-top:0.8rem;padding:0.7rem 1rem;background:#f1f5f9;
-                    border-radius:8px;font-size:0.74rem;color:#64748b;line-height:1.6;'>
-            ℹ️ <strong>Sobre estes dados:</strong> Informações do fundo subjacente (ETF nos EUA)
-            obtidas via Yahoo Finance. O BDR negociado na B3 (terminação 39) replica a cota deste
-            fundo, sujeito a variações de câmbio (USD/BRL). Taxa de administração, AUM e composição
-            referem-se ao fundo original — não à BDR.
-        </div>""", unsafe_allow_html=True)
-
-
-st.set_page_config(
-    page_title="Monitor BDRs - Swing Trade",
-    page_icon="📉",
-    layout="wide"
-)
-
-warnings.filterwarnings('ignore')
-
-plt.style.use('seaborn-v0_8-darkgrid')
-
-sns.set_palette("husl")
-
-TERMINACOES_BDR = ('31', '32', '33', '34', '35', '39')
-
+# CSS customizado para aparência profissional
 st.markdown("""
 <style>
     /* Cabeçalho principal */
@@ -6967,14 +6092,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Cabeçalho profissional
+from datetime import datetime
+import pytz
+
+# Obter data e hora do Brasil
 fuso_brasil = pytz.timezone('America/Sao_Paulo')
-
 agora = datetime.now(fuso_brasil)
-
 data_hora_analise = agora.strftime("%d/%m/%Y às %H:%M:%S")
-
 dia_semana = agora.strftime("%A")
-
 dias_pt = {
     'Monday': 'Segunda-feira',
     'Tuesday': 'Terça-feira',
@@ -6984,7 +6110,6 @@ dias_pt = {
     'Saturday': 'Sábado',
     'Sunday': 'Domingo'
 }
-
 dia_semana_pt = dias_pt.get(dia_semana, dia_semana)
 
 st.markdown(f"""
@@ -6997,19 +6122,18 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+# Barra de informações
 col_info1, col_info2, col_info3 = st.columns(3)
-
 with col_info1:
     st.markdown("**📈 Estratégia:** Reversão em Sobrevenda")
-
 with col_info2:
     st.markdown("**🎯 Foco:** BDRs em Queda com Potencial")
-
 with col_info3:
     st.markdown("**⏱️ Timeframe:** 6 Meses | Diário")
 
 st.markdown("---")
 
+# Seção educacional (expansível)
 with st.expander("📚 Guia dos Indicadores - Entenda os Sinais", expanded=False):
     st.markdown("""
     ### 🎯 Índice de Sobrevenda (I.S.)
@@ -7075,7 +6199,6 @@ with st.expander("📚 Guia dos Indicadores - Entenda os Sinais", expanded=False
 st.markdown("---")
 
 if st.button("🔄 Atualizar Análise", type="primary"):
-    buscar_dados.clear()
     with st.spinner("Conectando à API e baixando dados..."):
         # Usar dicionário local de BDRs em vez de buscar da BRAPI
         lista_bdrs = list(NOMES_BDRS.keys())
@@ -7100,6 +6223,7 @@ if st.button("🔄 Atualizar Análise", type="primary"):
             st.session_state['oportunidades'] = oportunidades
             st.session_state['df_calc'] = df_calc
 
+# Verificar se há dados no session_state
 if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
     oportunidades = st.session_state['oportunidades']
     df_calc = st.session_state['df_calc']
@@ -7122,7 +6246,7 @@ if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
     </div>
     """, unsafe_allow_html=True)
 
-    col_filtro1, col_filtro2, col_filtro3, col_filtro4 = st.columns(4)
+    col_filtro1, col_filtro2, col_filtro3 = st.columns(3)
 
     with col_filtro1:
         filtrar_ema20 = st.checkbox(
@@ -7145,13 +6269,6 @@ if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
             help="Preço acima da EMA200 (longo prazo)"
         )
 
-    with col_filtro4:
-        filtrar_etf = st.checkbox(
-            "🧺 Apenas ETFs (BDR terminação 39)",
-            value=False,
-            help="Mostra somente BDRs de ETFs (que tiveram queda no dia)"
-        )
-
     # Slider de liquidez
     st.markdown("**💧 Liquidez mínima:**")
     ranking_min_liq = st.slider(
@@ -7161,19 +6278,13 @@ if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
     )
 
     # Aplicar filtros se algum selecionado
-    if filtrar_ema20 or filtrar_ema50 or filtrar_ema200 or filtrar_etf or ranking_min_liq > 0:
+    if filtrar_ema20 or filtrar_ema50 or filtrar_ema200 or ranking_min_liq > 0:
         df_res_filtrado = []
-        contadores = {'ema20': 0, 'ema50': 0, 'ema200': 0, 'etf': 0, 'sem_dados': 0}
+        contadores = {'ema20': 0, 'ema50': 0, 'ema200': 0, 'sem_dados': 0}
 
         for opp in oportunidades:
             ticker = opp['Ticker']
             try:
-                # Filtro de ETF — aplicado primeiro, sem precisar de df_calc
-                if filtrar_etf:
-                    if not eh_etf(ticker):
-                        continue
-                    contadores['etf'] += 1
-
                 df_ticker = df_calc.xs(ticker, axis=1, level=1).dropna()
 
                 # Verificar tamanho mínimo
@@ -7246,14 +6357,12 @@ if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
                 filtros_ativos.append(f"EMA50 ({contadores['ema50']} ✓)")
             if filtrar_ema200:
                 filtros_ativos.append(f"EMA200 ({contadores['ema200']} ✓)")
-            if filtrar_etf:
-                filtros_ativos.append(f"ETFs ({contadores['etf']} ✓)")
 
             st.markdown(f"""
             <div style='background: linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%);
                         padding: 1rem; border-radius: 8px; margin: 1rem 0;'>
                 <p style='margin: 0; color: #166534; font-weight: 600; font-size: 1.1rem;'>
-                    ✅ {len(df_res)} BDRs encontradas | Filtros ativos: {' + '.join(filtros_ativos) if filtros_ativos else 'Liquidez'}
+                    ✅ {len(df_res)} BDRs encontradas | Filtros ativos: {' + '.join(filtros_ativos)}
                 </p>
             </div>
             """, unsafe_allow_html=True)
@@ -7266,8 +6375,6 @@ if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
                 filtros_ativos.append(f"EMA50 ({contadores['ema50']} acima)")
             if filtrar_ema200:
                 filtros_ativos.append(f"EMA200 ({contadores['ema200']} acima)")
-            if filtrar_etf:
-                filtros_ativos.append(f"ETFs ({contadores['etf']} encontradas)")
 
             st.markdown(f"""
             <div style='background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
@@ -7481,13 +6588,6 @@ if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
 
             except Exception as e:
                 st.error(f"❌ Erro ao carregar gráfico: {e}")
-
-            # === PAINEL DETALHADO DE ETF (se aplicável) ===
-            if eh_etf(ticker):
-                st.markdown("---")
-                with st.spinner(f"Buscando dados detalhados da ETF {ticker}..."):
-                    dados_etf = buscar_dados_etf(ticker)
-                renderizar_painel_etf(dados_etf, ticker, row['Empresa'])
 
             # === ESTRATÉGIA TRIPLE SCREEN ===
             st.markdown("---")
@@ -7884,8 +6984,8 @@ if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
         </div>
         """, unsafe_allow_html=True)
 
+# Rodapé profissional
 st.markdown("---")
-
 st.markdown("""
 <div style='text-align: center; padding: 2rem 0; color: #64748b;'>
     <p style='margin: 0; font-size: 0.9rem;'>

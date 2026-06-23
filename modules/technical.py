@@ -11,8 +11,10 @@ import warnings
 import xml.etree.ElementTree as ET
 import html as html_lib
 import re
+import time
 
 PERIODO = "1y"  # 1 ano para ter dados suficientes para EMA200 (~252 dias úteis)
+_LOTE = 50      # tickers por lote — evita rate limit do Yahoo Finance
 
 
 @st.cache_data(ttl=1800)
@@ -20,9 +22,28 @@ def buscar_dados(tickers):
     if not tickers: return pd.DataFrame()
     sa_tickers = [f"{t}.SA" for t in tickers]
     try:
-        # Mantendo o método que você gosta (rápido)
-        df = yf.download(sa_tickers, period=PERIODO, auto_adjust=True, progress=False, timeout=60)
-        if df.empty: return pd.DataFrame()
+        partes = []
+        for i in range(0, len(sa_tickers), _LOTE):
+            lote = sa_tickers[i:i + _LOTE]
+            try:
+                parte = yf.download(
+                    lote, period=PERIODO, auto_adjust=True,
+                    progress=False, timeout=60, threads=False,
+                )
+                if not parte.empty:
+                    partes.append(parte)
+            except Exception:
+                pass
+            if i + _LOTE < len(sa_tickers):
+                time.sleep(1)
+
+        if not partes:
+            return pd.DataFrame()
+
+        df = pd.concat(partes, axis=1) if len(partes) > 1 else partes[0]
+        # Remove colunas duplicadas que podem surgir do concat
+        df = df.loc[:, ~df.columns.duplicated()]
+
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = pd.MultiIndex.from_tuples([(c[0], c[1].replace(".SA", "")) for c in df.columns])
 

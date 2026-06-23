@@ -27,6 +27,7 @@ from modules.technical import *
 from modules.styles import *
 from modules.etf import *
 from modules.etf import eh_etf, buscar_dados_etf
+from modules.flow import renderizar_painel_flow
 
 st.set_page_config(
     page_title="Monitor BDRs - Swing Trade",
@@ -230,7 +231,17 @@ with st.expander("📚 Guia dos Indicadores - Entenda os Sinais", expanded=False
 
 st.markdown("---")
 
-if st.button("🔄 Atualizar Análise", type="primary"):
+col_btn1, col_btn2 = st.columns([2, 10])
+with col_btn1:
+    btn_atualizar = st.button("🔄 Atualizar Análise", type="primary")
+with col_btn2:
+    btn_limpar = st.button("🗑️ Limpar Cache", help="Limpe o cache caso os gráficos fiquem travados em dias anteriores")
+
+if btn_limpar:
+    st.cache_data.clear()
+    st.rerun()
+
+if btn_atualizar:
     buscar_dados.clear()
     with st.spinner("Conectando à API e baixando dados..."):
         # Usar dicionário local de BDRs em vez de buscar da BRAPI
@@ -908,6 +919,13 @@ if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
             # === ANÁLISE DE FASE — METODOLOGIA MINERVINI ===
             resultado_mv = _calcular_minervini_cached(ticker)
             renderizar_painel_minervini(resultado_mv, ticker, row['Empresa'])
+
+            # === FLOW.AI — FLUXO DE BIG PLAYERS ===
+            try:
+                df_flow_input = df_calc.xs(ticker, axis=1, level=1).dropna()
+                renderizar_painel_flow(df_flow_input, ticker, row['Empresa'])
+            except Exception:
+                pass
 
             # === TRADINGVIEW SCREENER — DADOS AO VIVO ===
             ticker_us_tv = mapear_ticker_us(ticker)

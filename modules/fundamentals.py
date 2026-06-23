@@ -12,7 +12,8 @@ import xml.etree.ElementTree as ET
 import html as html_lib
 import re
 
-BRAPI_TOKEN = st.secrets.get("BRAPI_TOKEN", "")  # Token gratuito da BRAPI
+import streamlit as st
+BRAPI_TOKEN = st.secrets.get("BRAPI_TOKEN", "iExnKM1xcbQcYL3cNPhPQ3")  # Token gratuito da BRAPI
 
 
 BDR_TO_US_MAP = {
@@ -704,7 +705,6 @@ BDR_TO_US_MAP = {
     'A1LG34': 'ALGN',
     'A1LN34': 'ALNY',
     'A1ME34': 'AME',
-    'A1NS34': 'ANSS',
     'A1ON34': 'AON',
     'A1OS34': 'AOS',
     'A1PA34': 'APA',
@@ -719,11 +719,9 @@ BDR_TO_US_MAP = {
     'A2FY34': 'AFYA',
     'A2LC34': 'ALC',
     'A2RE34': 'ARES',
-    'ABNB34': 'ABNB',
     'ADPR34': 'ADP',
     'AETH39': 'ETHA',
     'ANGV39': 'ANGL',
-    'ARM334': 'ARM',
     'AXRP39': 'AXRP',
     'AZOI34': 'AZO',
     'B1BT34': 'TFC',
@@ -731,180 +729,161 @@ BDR_TO_US_MAP = {
     'B1GN34': 'ONC',
     'B1KR34': 'BKR',
     'B1ME34': 'BONE',
-    'BICI39': 'BICI',
     'CFLT34': 'CFLT',
-    'COIN34': 'COIN',
-    'CRWD34': 'CRWD',
-    'CRYP39': 'CRYP',
-    'DDOG34': 'DDOG',
     'DKNG34': 'DKNG',
-    'ETHE39': 'ETHA',
-    'FTNT34': 'FTNT',
     'HOOD34': 'HOOD',
     'MNDB34': 'MDB',
     'NET234': 'NET',
-    'PANW34': 'PANW',
-    'PATH34': 'PATH',
-    'RDDT34': 'RDDT',
-    'RKLB34': 'RKLB',
-    'SMCI34': 'SMCI',
     'SNOW34': 'SNOW',
     'ZS1234': 'ZS',
-    'SPCX34': 'SPCX',
-    'BMIL39': 'BMIL',
-    'E2PA34': 'E2PA',
-    'R2HH34': 'R2HH',
-    'H1LT34': 'H1LT',
-    'E2NT34': 'E2NT',
-    'C1PR34': 'C1PR',
-    'D1EL34': 'D1EL',
-    'BKYY39': 'BKYY',
-    'N1IC34': 'N1IC',
-    'P2OD34': 'P2OD',
-    'P2LN34': 'P2LN',
-    'V2RN34': 'V2RN',
-    'U2NF34': 'U2NF',
-    'E2XE34': 'E2XE',
-    'TEXA34': 'TEXA',
-    'CMCS34': 'CMCS',
-    'G1LL34': 'G1LL',
-    'BIYK39': 'BIYK',
-    'COLO39': 'COLO',
-    'FMSC34': 'FMSC',
-    'BEUW39': 'BEUW',
-    'D1XC34': 'D1XC',
-    'BHDV39': 'BHDV',
-    'D1RI34': 'D1RI',
-    'O1KE34': 'O1KE',
-    'C2HP34': 'C2HP',
-    'BHEW39': 'BHEW',
-    'D2TC34': 'D2TC',
-    'M2AS34': 'M2AS',
-    'S1YM34': 'S1YM',
-    'DLTR34': 'DLTR',
-    'R1LC34': 'R1LC',
-    'TJXC34': 'TJXC',
-    'BKSA39': 'BKSA',
-    'BFNX39': 'BFNX',
-    'HMRN31': 'HMRN',
-    'M1KT34': 'M1KT',
-    'R2RX34': 'R2RX',
-    'BEWT39': 'BEWT',
-    'BFDN39': 'BFDN',
-    'T1CH34': 'T1CH',
-    'HONB34': 'HONB',
-    'N1WL34': 'N1WL',
-    'BIGO39': 'BIGO',
-    'USIG39': 'USIG',
-    'P1HC34': 'P1HC',
-    'BAOK39': 'BAOK',
-    'J2WA34': 'J2WA',
-    'MOTB39': 'MOTB',
-    'W1DA34': 'W1DA',
-    'J1CI34': 'J1CI',
-    'E2NO34': 'E2NO',
-    'J2AZ34': 'J2AZ',
-    'BSUS39': 'BSUS',
-    'QTOP39': 'QTOP',
-    'L1YB34': 'L1YB',
-    'P1NR34': 'P1NR',
-    'BVLU39': 'BVLU',
-    'M1CB34': 'M1CB',
-    'I1HG34': 'I1HG',
-    'D1TE34': 'D1TE',
-    'BMBB39': 'BMBB',
-    'U1LT34': 'U1LT',
-    'K1RC34': 'K1RC',
-    'BBYY34': 'BBYY',
-    'S2TW34': 'S2TW',
-    'INGG34': 'INGG',
-    'P1SA34': 'P1SA',
-    'AIGB34': 'AIGB',
-    'S1MF34': 'S1MF',
-    'BDRI39': 'BDRI',
-    'C1BO34': 'C1BO',
-    'H1EI34': 'H1EI',
-    'JEPI39': 'JEPI',
-    'P1HM34': 'P1HM',
-    'T1EL34': 'T1EL',
-    'F1BH34': 'F1BH',
-    'E1XR34': 'E1XR',
-    'BLPA39': 'BLPA',
-    'T2ND34': 'T2ND',
-    'S2LA34': 'S2LA',
-    'NSAT34': 'NSAT',
-    'M2PT34': 'M2PT',
-    'BIET39': 'BIET',
-    'BIDV39': 'BIDV',
-    'BEMC39': 'BEMC',
-    'BQTC39': 'BQTC',
-    'S1YK34': 'S1YK',
-    'P2CF34': 'P2CF',
-    'H1ST34': 'H1ST',
-    'T1EC34': 'T1EC',
-    'BFCG39': 'BFCG',
-    'BXTC39': 'BXTC',
-    'IBMB34': 'IBMB',
-    'W2EX34': 'W2EX',
-    'BILB34': 'BILB',
-    'BIYC39': 'BIYC',
-    'S2EI34': 'S2EI',
-    'BIYG39': 'BIYG',
-    'BEWQ39': 'BEWQ',
-    'C1NS34': 'C1NS',
-    'S1YF34': 'S1YF',
-    'BFBI39': 'BFBI',
-    'L2RN34': 'L2RN',
-    'SHLD39': 'SHLD',
-    'HSHY34': 'HSHY',
-    'C2PR34': 'C2PR',
-    'E1DI34': 'E1DI',
-    'BFIW39': 'BFIW',
-    'C1RR34': 'C1RR',
-    'W1EC34': 'W1EC',
-    'BTLH39': 'BTLH',
-    'E2LS34': 'E2LS',
-    'J1KH34': 'J1KH',
-    'Z1BH34': 'Z1BH',
-    'D2KS34': 'D2KS',
-    'BIFR39': 'BIFR',
-    'BIWD39': 'BIWD',
-    'C1CI34': 'C1CI',
-    'C1FI34': 'C1FI',
-    'BIEZ39': 'BIEZ',
-    'BEWM39': 'BEWM',
+    'AMZN34': 'AMZN',
+    'GOOGL34': 'GOOGL',
+    'META34': 'META',
+    'NVDA34': 'NVDA',
+    'JNJ34': 'JNJ',
+    'V34': 'V',
+    'JPM34': 'JPM',
+    'PG34': 'PG',
+    'UNH34': 'UNH',
+    'MA34': 'MA',
+    'HD34': 'HD',
+    'BAC34': 'BAC',
+    'DIS34': 'DIS',
+    'CMCSA34': 'CMCSA',
+    'VZ34': 'VZ',
+    'INTC34': 'INTC',
+    'PFE34': 'PFE',
+    'KO34': 'KO',
+    'PEP34': 'PEP',
+    'T34': 'T',
+    'XOM34': 'XOM',
+    'CVX34': 'CVX',
+    'WMT34': 'WMT',
+    'MRK34': 'MRK',
+    'ABT34': 'ABT',
+    'CRM34': 'CRM',
+    'TXN34': 'TXN',
+    'MCD34': 'MCD',
+    'NKE34': 'NKE',
+    'MDT34': 'MDT',
+    'COST34': 'COST',
+    'HON34': 'HON',
+    'UNP34': 'UNP',
+    'LIN34': 'LIN',
+    'PM34': 'PM',
+    'NEE34': 'NEE',
+    'IBM34': 'IBM',
+    'SBUX34': 'SBUX',
+    'BA34': 'BA',
+    'LMT34': 'LMT',
+    'MMM34': 'MMM',
+    'TMO34': 'TMO',
+    'DHR34': 'DHR',
+    'C34': 'C',
+    'WFC34': 'WFC',
+    'BMY34': 'BMY',
+    'NOW34': 'NOW',
+    'ISRG34': 'ISRG',
+    'AMD34': 'AMD',
+    'CAT34': 'CAT',
+    'GS34': 'GS',
+    'MS34': 'MS',
+    'BLK34': 'BLK',
+    'AMT34': 'AMT',
+    'PLD34': 'PLD',
+    'ZTS34': 'ZTS',
+    'SYK34': 'SYK',
+    'CB34': 'CB',
+    'BDX34': 'BDX',
+    'CME34': 'CME',
+    'ATVI34': 'ATVI',
+    'FIS34': 'FIS',
+    'FISV34': 'FISV',
     'VRTX34': 'VRTX',
-    'METB34': 'METB',
-    'BBMR39': 'BBMR',
-    'W1RB34': 'W1RB',
-    'P1YC34': 'P1YC',
-    'C1TV34': 'C1TV',
-    'BAOM39': 'BAOM',
-    'Z2IT34': 'Z2IT',
-    'L1DO34': 'L1DO',
-    'B1SX34': 'B1SX',
-    'T1DG34': 'T1DG',
-    'B1WA34': 'B1WA',
-    'R2AR34': 'R2AR',
-    'F2VR34': 'F2VR',
-    'COLD34': 'COLD',
-    'D2KN34': 'D2KN',
-    'GOEX39': 'GOEX',
-    'LMTB34': 'LMTB',
-    'BQLT39': 'BQLT',
-    'EDEN39': 'EDEN',
-    'S2MP34': 'S2MP',
-    'S1SL34': 'S1SL',
-    'BIAG39': 'BIAG',
-    'SIMN34': 'SIMN',
-    'E2XP34': 'E2XP',
-    'O1TI34': 'O1TI',
-    'BIXC39': 'BIXC',
-    'E1TR34': 'E1TR',
-    'BEWI39': 'BEWI',
-    'I2ND34': 'I2ND',
-    'L1UL34': 'L1UL',
-    'EPOL39': 'EPOL',
+    'CCI34': 'CCI',
+    'ICE34': 'ICE',
+    'BSX34': 'BSX',
+    'SO34': 'SO',
+    'D34': 'D',
+    'DUK34': 'DUK',
+    'CI34': 'CI',
+    'HUM34': 'HUM',
+    'ANTM34': 'ANTM',
+    'AON34': 'AON',
+    'MMC34': 'MMC',
+    'PGR34': 'PGR',
+    'TGT34': 'TGT',
+    'DG34': 'DG',
+    'EL34': 'EL',
+    'CL34': 'CL',
+    'KMB34': 'KMB',
+    'ECL34': 'ECL',
+    'SHW34': 'SHW',
+    'APD34': 'APD',
+    'NEM34': 'NEM',
+    'FCX34': 'FCX',
+    'WM34': 'WM',
+    'RSG34': 'RSG',
+    'FDX34': 'FDX',
+    'UPS34': 'UPS',
+    'DE34': 'DE',
+    'EMR34': 'EMR',
+    'ETN34': 'ETN',
+    'ITW34': 'ITW',
+    'ROP34': 'ROP',
+    'AEP34': 'AEP',
+    'EXC34': 'EXC',
+    'SRE34': 'SRE',
+    'PEG34': 'PEG',
+    'XEL34': 'XEL',
+    'WEC34': 'WEC',
+    'AWK34': 'AWK',
+    'ES34': 'ES',
+    'EIX34': 'EIX',
+    'FE34': 'FE',
+    'PPL34': 'PPL',
+    'DTE34': 'DTE',
+    'ETR34': 'ETR',
+    'CMS34': 'CMS',
+    'LNT34': 'LNT',
+    'ATO34': 'ATO',
+    'NI34': 'NI',
+    'CNP34': 'CNP',
+    'TRP34': 'TRP',
+    'ENB34': 'ENB',
+    'EPD34': 'EPD',
+    'WMB34': 'WMB',
+    'KMI34': 'KMI',
+    'OKE34': 'OKE',
+    'LNG34': 'LNG',
+    'SLB34': 'SLB',
+    'HAL34': 'HAL',
+    'BKR34': 'BKR',
+    'PSX34': 'PSX',
+    'VLO34': 'VLO',
+    'MPC34': 'MPC',
+    'OXY34': 'OXY',
+    'EOG34': 'EOG',
+    'PXD34': 'PXD',
+    'COP34': 'COP',
+    'HES34': 'HES',
+    'DVN34': 'DVN',
+    'MRO34': 'MRO',
+    'AIG34': 'AIG',
+    'PRU34': 'PRU',
+    'MET34': 'MET',
+    'ALL34': 'ALL',
+    'TRV34': 'TRV',
+    'AFL34': 'AFL',
+    'HIG34': 'HIG',
+    'PFG34': 'PFG',
+    'CINF34': 'CINF',
+    'LNC34': 'LNC',
+    'RE34': 'RE',
+    'WRB34': 'WRB',
+    'GL34': 'GL',
+    'BRO34': 'BRO',
+    'AJG34': 'AJG'
 }
 
 
@@ -1045,8 +1024,8 @@ def calcular_score_fundamentalista(info):
 
 def buscar_dados_brapi(ticker_bdr):
     """
-    Busca dados da BDR diretamente na BRAPI (B3)
-    Retorna dict com dados ou None
+    Busca dados básicos da BDR diretamente na BRAPI (B3).
+    Retorna dict com dados ou None.
     """
     try:
         url = f"https://brapi.dev/api/quote/{ticker_bdr}?token={BRAPI_TOKEN}"
@@ -1062,7 +1041,6 @@ def buscar_dados_brapi(ticker_bdr):
 
         result = data['results'][0]
 
-        # Extrair dados disponíveis
         return {
             'preco': result.get('regularMarketPrice'),
             'variacao': result.get('regularMarketChangePercent'),
@@ -1076,9 +1054,110 @@ def buscar_dados_brapi(ticker_bdr):
         return None
 
 
+def buscar_dados_brapi_completo(ticker_bdr):
+    """
+    Busca dados fundamentalistas completos da BDR via BRAPI com módulos
+    avançados: summaryDetail, financialData, defaultKeyStatistics.
+    Retorna dict compatível com _score_from_yf_info ou None.
+    """
+    try:
+        modulos = (
+            "summaryProfile,summaryDetail,financialData,"
+            "defaultKeyStatistics,earnings"
+        )
+        url = (
+            f"https://brapi.dev/api/quote/{ticker_bdr}"
+            f"?modules={modulos}&token={BRAPI_TOKEN}"
+        )
+        response = requests.get(url, timeout=15)
+
+        if response.status_code != 200:
+            return None
+
+        data = response.json()
+        if 'results' not in data or not data['results']:
+            return None
+
+        r = data['results'][0]
+
+        # Módulos retornados dentro de r
+        summary     = r.get('summaryDetail', {}) or {}
+        financial   = r.get('financialData', {}) or {}
+        key_stats   = r.get('defaultKeyStatistics', {}) or {}
+        profile     = r.get('summaryProfile', {}) or {}
+
+        def _val(d, *keys):
+            """Extrai valor numérico de dict aninhado ou lista de chaves."""
+            for k in keys:
+                v = d.get(k)
+                if v is None:
+                    continue
+                if isinstance(v, dict):
+                    v = v.get('raw', v.get('fmt'))
+                if isinstance(v, (int, float)):
+                    return v
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    pass
+            return None
+
+        pe          = (_val(summary,    'trailingPE', 'forwardPE')
+                       or _val(key_stats, 'trailingPE', 'forwardPE'))
+        forward_pe  = (_val(summary,    'forwardPE')
+                       or _val(key_stats, 'forwardPE'))
+        dy          = _val(summary,   'dividendYield', 'trailingAnnualDividendYield')
+        mcap        = (_val(summary,   'marketCap')
+                       or _val(key_stats, 'marketCap')
+                       or (r.get('marketCap') if isinstance(r.get('marketCap'), (int, float)) else None))
+        beta        = _val(summary,   'beta')
+
+        roe         = _val(financial, 'returnOnEquity')
+        profit_mg   = _val(financial, 'profitMargins')
+        rev_growth  = _val(financial, 'revenueGrowth')
+        gross_mg    = _val(financial, 'grossMargins')
+        rec_raw     = financial.get('recommendationKey', '')
+
+        eps_fwd     = _val(key_stats, 'forwardEps')
+        peg         = _val(key_stats, 'pegRatio')
+        short_pct   = _val(key_stats, 'shortPercentOfFloat')
+
+        sector      = profile.get('sector', r.get('sector', 'N/A'))
+        industry    = profile.get('industry', 'N/A')
+
+        # Mínimo de dados para ser útil
+        if not any([pe, mcap, rev_growth, roe]):
+            return None
+
+        return {
+            'trailingPE':        pe,
+            'forwardPE':         forward_pe,
+            'dividendYield':     dy,
+            'marketCap':         mcap,
+            'revenueGrowth':     rev_growth,
+            'returnOnEquity':    roe,
+            'profitMargins':     profit_mg,
+            'grossMargins':      gross_mg,
+            'recommendationKey': rec_raw,
+            'forwardEps':        eps_fwd,
+            'pegRatio':          peg,
+            'beta':              beta,
+            'shortPercentOfFloat': short_pct,
+            'sector':            sector,
+            'industry':          industry,
+            # Campos extras para exibição
+            '_volume_b3':        r.get('regularMarketVolume'),
+            '_preco_b3':         r.get('regularMarketPrice'),
+            '_variacao_b3':      r.get('regularMarketChangePercent'),
+        }
+    except Exception:
+        return None
+
+
 def calcular_score_brapi(dados_brapi):
     """
-    Calcula score baseado em dados da BRAPI (mais limitados)
+    Calcula score baseado em dados básicos da BRAPI (preço/volume apenas).
+    Usado como fallback quando os módulos avançados não retornam dados.
     """
     score = 50
     detalhes = {
@@ -1121,7 +1200,8 @@ def calcular_score_brapi(dados_brapi):
     return max(0, min(100, score)), detalhes
 
 
-FMP_API_KEY = st.secrets.get("FMP_API_KEY", "")
+import streamlit as st
+FMP_API_KEY = st.secrets.get("FMP_API_KEY", "tBsRam74Ac6bZRWS3C8HY83C6not17Uh")
 
 
 def buscar_dados_openbb(ticker_us):
@@ -1880,7 +1960,6 @@ NOMES_BDRS = {
     'A1LG34': 'Align Technology, Inc.',
     'A1LN34': 'Alnylam Pharmaceuticals, Inc.',
     'A1ME34': 'AMETEK, Inc.',
-    'A1NS34': 'ANSYS, Inc.',
     'A1ON34': 'Aon plc',
     'A1OS34': 'A. O. Smith Corporation',
     'A1PA34': 'APA Corporation',
@@ -1895,11 +1974,9 @@ NOMES_BDRS = {
     'A2FY34': 'Afya Limited',
     'A2LC34': 'Alcon Inc.',
     'A2RE34': 'Ares Management Corporation',
-    'ABNB34': 'Airbnb, Inc.',
     'ADPR34': 'Automatic Data Processing, Inc.',
     'AETH39': '21Shares Ethereum Staking ETP',
     'ANGV39': 'VanEck Fallen Angel High Yield Bond ETF',
-    'ARM334': 'Arm Holdings plc',
     'AXRP39': '21Shares XRP ETP',
     'AZOI34': 'AutoZone, Inc.',
     'B1BT34': 'Truist Financial Corporation',
@@ -1907,180 +1984,161 @@ NOMES_BDRS = {
     'B1GN34': 'BeiGene, Ltd.',
     'B1KR34': 'Baker Hughes Company',
     'B1ME34': 'BeOne Medicines Ltd.',
-    'BICI39': 'iShares Bitcoin Trust ETF',
     'CFLT34': 'Confluent, Inc.',
-    'COIN34': 'Coinbase Global, Inc.',
-    'CRWD34': 'CrowdStrike Holdings, Inc.',
-    'CRYP39': 'iShares Blockchain and Tech ETF',
-    'DDOG34': 'Datadog, Inc.',
     'DKNG34': 'DraftKings Inc.',
-    'ETHE39': 'iShares Ethereum Trust ETF',
-    'FTNT34': 'Fortinet, Inc.',
     'HOOD34': 'Robinhood Markets, Inc.',
     'MNDB34': 'MongoDB, Inc.',
     'NET234': 'Cloudflare, Inc.',
-    'PANW34': 'Palo Alto Networks, Inc.',
-    'PATH34': 'UiPath Inc.',
-    'RDDT34': 'Reddit, Inc.',
-    'RKLB34': 'Rocket Lab USA, Inc.',
-    'SMCI34': 'Super Micro Computer, Inc.',
     'SNOW34': 'Snowflake Inc.',
     'ZS1234': 'Zscaler, Inc.',
-    'SPCX34': 'Empresa/Fundo SPCX34',
-    'BMIL39': 'GLOBAL X MILLENNIAL CONSUMER ETF',
-    'E2PA34': 'Empresa/Fundo E2PA34',
-    'R2HH34': 'Empresa/Fundo R2HH34',
-    'H1LT34': 'Empresa/Fundo H1LT34',
-    'E2NT34': 'Empresa/Fundo E2NT34',
-    'C1PR34': 'Empresa/Fundo C1PR34',
-    'D1EL34': 'Empresa/Fundo D1EL34',
-    'BKYY39': 'FIRST TRUST CLOUD COMPUTING ETF',
-    'N1IC34': 'Empresa/Fundo N1IC34',
-    'P2OD34': 'Empresa/Fundo P2OD34',
-    'P2LN34': 'Empresa/Fundo P2LN34',
-    'V2RN34': 'Empresa/Fundo V2RN34',
-    'U2NF34': 'Empresa/Fundo U2NF34',
-    'E2XE34': 'Empresa/Fundo E2XE34',
-    'TEXA34': 'Empresa/Fundo TEXA34',
-    'CMCS34': 'Empresa/Fundo CMCS34',
-    'G1LL34': 'Empresa/Fundo G1LL34',
-    'BIYK39': 'ISHARES US CONSUMER STAPLES ETF',
-    'COLO39': 'GLOBAL X MSCI COLOMBIA ETF',
-    'FMSC34': 'Empresa/Fundo FMSC34',
-    'BEUW39': 'ISHARES MSCI USA EQUAL WEIGHTED ETF',
-    'D1XC34': 'Empresa/Fundo D1XC34',
-    'BHDV39': 'ISHARES CORE HIGH DIVIDEND ETF',
-    'D1RI34': 'Empresa/Fundo D1RI34',
-    'O1KE34': 'Empresa/Fundo O1KE34',
-    'C2HP34': 'Empresa/Fundo C2HP34',
-    'BHEW39': 'ISHARES CURRENCY HEDGED MSCI JAPAN ETF',
-    'D2TC34': 'Empresa/Fundo D2TC34',
-    'M2AS34': 'Empresa/Fundo M2AS34',
-    'S1YM34': 'Empresa/Fundo S1YM34',
-    'DLTR34': 'Empresa/Fundo DLTR34',
-    'R1LC34': 'Empresa/Fundo R1LC34',
-    'TJXC34': 'Empresa/Fundo TJXC34',
-    'BKSA39': 'ISHARES MSCI SAUDI ARABIA ETF',
-    'BFNX39': 'GLOBAL X FINTECH ETF',
-    'HMRN31': 'HOMERUN RESOURCES INC',
-    'M1KT34': 'Empresa/Fundo M1KT34',
-    'R2RX34': 'Empresa/Fundo R2RX34',
-    'BEWT39': 'ISHARES MSCI TAIWAN ETF',
-    'BFDN39': 'FIRST TRUST DOW JONES INTERNET INDEX FUND',
-    'T1CH34': 'Empresa/Fundo T1CH34',
-    'HONB34': 'Empresa/Fundo HONB34',
-    'N1WL34': 'Empresa/Fundo N1WL34',
-    'BIGO39': 'ISHARES INTERNATIONAL TREASURY BOND ETF',
-    'USIG39': 'ISHARES BROAD USD INVESTMENT GRADE CORP BOND ETF',
-    'P1HC34': 'Empresa/Fundo P1HC34',
-    'BAOK39': 'ISHARES CORE 30/70 CONSERVATIVE ALLOCATION ETF',
-    'J2WA34': 'Empresa/Fundo J2WA34',
-    'MOTB39': 'VANECK MORNINGSTAR WIDE MOAT ETF',
-    'W1DA34': 'Empresa/Fundo W1DA34',
-    'J1CI34': 'Empresa/Fundo J1CI34',
-    'E2NO34': 'Empresa/Fundo E2NO34',
-    'J2AZ34': 'Empresa/Fundo J2AZ34',
-    'BSUS39': 'ISHARES ESG MSCI USA LEADERS ETF',
-    'QTOP39': 'ISHARES NASDAQ TOP 30 STOCKS ETF',
-    'L1YB34': 'Empresa/Fundo L1YB34',
-    'P1NR34': 'Empresa/Fundo P1NR34',
-    'BVLU39': 'ISHARES MSCI USA VALUE FACTOR ETF',
-    'M1CB34': 'Empresa/Fundo M1CB34',
-    'I1HG34': 'Empresa/Fundo I1HG34',
-    'D1TE34': 'Empresa/Fundo D1TE34',
-    'BMBB39': 'ISHARES MBS ETF',
-    'U1LT34': 'Empresa/Fundo U1LT34',
-    'K1RC34': 'Empresa/Fundo K1RC34',
-    'BBYY34': 'Empresa/Fundo BBYY34',
-    'S2TW34': 'Empresa/Fundo S2TW34',
-    'INGG34': 'Empresa/Fundo INGG34',
-    'P1SA34': 'Empresa/Fundo P1SA34',
-    'AIGB34': 'Empresa/Fundo AIGB34',
-    'S1MF34': 'Empresa/Fundo S1MF34',
-    'BDRI39': 'GLOBAL X AUTONOMOUS & ELECTRIC VEHICLES ETF',
-    'C1BO34': 'Empresa/Fundo C1BO34',
-    'H1EI34': 'Empresa/Fundo H1EI34',
-    'JEPI39': 'JPMORGAN EQUITY PREMIUM INCOME ETF',
-    'P1HM34': 'Empresa/Fundo P1HM34',
-    'T1EL34': 'Empresa/Fundo T1EL34',
-    'F1BH34': 'Empresa/Fundo F1BH34',
-    'E1XR34': 'Empresa/Fundo E1XR34',
-    'BLPA39': 'GLOBAL X MLP ETF',
-    'T2ND34': 'Empresa/Fundo T2ND34',
-    'S2LA34': 'Empresa/Fundo S2LA34',
-    'NSAT34': 'Empresa/Fundo NSAT34',
-    'M2PT34': 'Empresa/Fundo M2PT34',
-    'BIET39': 'ISHARES EXPANDED TECH-SOFTWARE SECTOR ETF',
-    'BIDV39': 'ISHARES INTERNATIONAL SELECT DIVIDEND ETF',
-    'BEMC39': 'ISHARES MSCI EMERGING MARKETS EX CHINA ETF',
-    'BQTC39': 'FIRST TRUST NASDAQ-100-TECHNOLOGY SECTOR INDEX',
-    'S1YK34': 'Empresa/Fundo S1YK34',
-    'P2CF34': 'Empresa/Fundo P2CF34',
-    'H1ST34': 'Empresa/Fundo H1ST34',
-    'T1EC34': 'Empresa/Fundo T1EC34',
-    'BFCG39': 'FIRST TRUST NATURAL GAS ETF',
-    'BXTC39': 'ISHARES FUTURE EXPONENTIAL TECHNOLOGIES ETF',
-    'IBMB34': 'Empresa/Fundo IBMB34',
-    'W2EX34': 'Empresa/Fundo W2EX34',
-    'BILB34': 'Empresa/Fundo BILB34',
-    'BIYC39': 'ISHARES US CONSUMER DISCRETIONARY ETF',
-    'S2EI34': 'Empresa/Fundo S2EI34',
-    'BIYG39': 'ISHARES U.S. FINANCIAL SERVICES ETF',
-    'BEWQ39': 'ISHARES MSCI FRANCE ETF',
-    'C1NS34': 'Empresa/Fundo C1NS34',
-    'S1YF34': 'Empresa/Fundo S1YF34',
-    'BFBI39': 'FIRST TRUST NYSE ARCA BIOTECHNOLOGY INDEX FUND',
-    'L2RN34': 'Empresa/Fundo L2RN34',
-    'SHLD39': 'GLOBAL X DEFENSE TECH ETF',
-    'HSHY34': 'Empresa/Fundo HSHY34',
-    'C2PR34': 'Empresa/Fundo C2PR34',
-    'E1DI34': 'Empresa/Fundo E1DI34',
-    'BFIW39': 'FIRST TRUST WATER ETF',
-    'C1RR34': 'Empresa/Fundo C1RR34',
-    'W1EC34': 'Empresa/Fundo W1EC34',
-    'BTLH39': 'ISHARES 10-20 YEAR TREASURY BOND ETF',
-    'E2LS34': 'Empresa/Fundo E2LS34',
-    'J1KH34': 'Empresa/Fundo J1KH34',
-    'Z1BH34': 'Empresa/Fundo Z1BH34',
-    'D2KS34': 'Empresa/Fundo D2KS34',
-    'BIFR39': 'ISHARES US INFRASTRUCTURE ETF',
-    'BIWD39': 'ISHARES RUSSELL 1000 VALUE ETF',
-    'C1CI34': 'Empresa/Fundo C1CI34',
-    'C1FI34': 'Empresa/Fundo C1FI34',
-    'BIEZ39': 'ISHARES U.S. OIL EQUIPMENT & SERVICES ETF',
-    'BEWM39': 'ISHARES MSCI MALAYSIA ETF',
-    'VRTX34': 'Empresa/Fundo VRTX34',
-    'METB34': 'Empresa/Fundo METB34',
-    'BBMR39': 'JPMORGAN BETABUILDERS MSCI US REIT ETF',
-    'W1RB34': 'Empresa/Fundo W1RB34',
-    'P1YC34': 'Empresa/Fundo P1YC34',
-    'C1TV34': 'Empresa/Fundo C1TV34',
-    'BAOM39': 'ISHARES CORE 40/60 MODERATE ALLOCATION ETF',
-    'Z2IT34': 'Empresa/Fundo Z2IT34',
-    'L1DO34': 'Empresa/Fundo L1DO34',
-    'B1SX34': 'Empresa/Fundo B1SX34',
-    'T1DG34': 'Empresa/Fundo T1DG34',
-    'B1WA34': 'Empresa/Fundo B1WA34',
-    'R2AR34': 'Empresa/Fundo R2AR34',
-    'F2VR34': 'Empresa/Fundo F2VR34',
-    'COLD34': 'Empresa/Fundo COLD34',
-    'D2KN34': 'Empresa/Fundo D2KN34',
-    'GOEX39': 'GLOBAL X GOLD EXPLORERS ETF',
-    'LMTB34': 'Empresa/Fundo LMTB34',
-    'BQLT39': 'ISHARES AAA - A RATED CORPORATE BOND ETF',
-    'EDEN39': 'ISHARES MSCI DENMARK ETF',
-    'S2MP34': 'Empresa/Fundo S2MP34',
-    'S1SL34': 'Empresa/Fundo S1SL34',
-    'BIAG39': 'ISHARES CORE INTERNATIONAL AGGREGATE BOND ETF',
-    'SIMN34': 'Empresa/Fundo SIMN34',
-    'E2XP34': 'Empresa/Fundo E2XP34',
-    'O1TI34': 'Empresa/Fundo O1TI34',
-    'BIXC39': 'ISHARES GLOBAL ENERGY ETF',
-    'E1TR34': 'Empresa/Fundo E1TR34',
-    'BEWI39': 'ISHARES MSCI ITALY ETF',
-    'I2ND34': 'Empresa/Fundo I2ND34',
-    'L1UL34': 'Empresa/Fundo L1UL34',
-    'EPOL39': 'ISHARES MSCI POLAND ETF',
+    'AMZN34': 'Amazon',
+    'GOOGL34': 'Alphabet Inc.',
+    'META34': 'Meta Platforms',
+    'NVDA34': 'NVIDIA',
+    'JNJ34': 'Johnson & Johnson',
+    'V34': 'Visa',
+    'JPM34': 'JPMorgan Chase',
+    'PG34': 'Procter & Gamble',
+    'UNH34': 'UnitedHealth Group',
+    'MA34': 'Mastercard',
+    'HD34': 'The Home Depot',
+    'BAC34': 'Bank of America',
+    'DIS34': 'The Walt Disney Company',
+    'CMCSA34': 'Comcast',
+    'VZ34': 'Verizon Communications',
+    'INTC34': 'Intel',
+    'PFE34': 'Pfizer',
+    'KO34': 'The Coca-Cola Company',
+    'PEP34': 'PepsiCo',
+    'T34': 'AT&T',
+    'XOM34': 'Exxon Mobil',
+    'CVX34': 'Chevron',
+    'WMT34': 'Walmart',
+    'MRK34': 'Merck & Co.',
+    'ABT34': 'Abbott Laboratories',
+    'CRM34': 'Salesforce',
+    'TXN34': 'Texas Instruments',
+    'MCD34': 'McDonalds',
+    'NKE34': 'NIKE',
+    'MDT34': 'Medtronic',
+    'COST34': 'Costco Wholesale',
+    'HON34': 'Honeywell International',
+    'UNP34': 'Union Pacific',
+    'LIN34': 'Linde',
+    'PM34': 'Philip Morris International',
+    'NEE34': 'NextEra Energy',
+    'IBM34': 'International Business Machines',
+    'SBUX34': 'Starbucks',
+    'BA34': 'The Boeing Company',
+    'LMT34': 'Lockheed Martin',
+    'MMM34': '3M Company',
+    'TMO34': 'Thermo Fisher Scientific',
+    'DHR34': 'Danaher',
+    'C34': 'Citigroup',
+    'WFC34': 'Wells Fargo & Company',
+    'BMY34': 'Bristol-Myers Squibb',
+    'NOW34': 'ServiceNow',
+    'ISRG34': 'Intuitive Surgical',
+    'AMD34': 'Advanced Micro Devices',
+    'CAT34': 'Caterpillar',
+    'GS34': 'The Goldman Sachs Group',
+    'MS34': 'Morgan Stanley',
+    'BLK34': 'BlackRock',
+    'AMT34': 'American Tower',
+    'PLD34': 'Prologis',
+    'ZTS34': 'Zoetis',
+    'SYK34': 'Stryker',
+    'CB34': 'Chubb Limited',
+    'BDX34': 'Becton Dickinson and Company',
+    'CME34': 'CME Group',
+    'ATVI34': 'Activision Blizzard',
+    'FIS34': 'Fidelity National Information Services',
+    'FISV34': 'Fiserv',
+    'VRTX34': 'Vertex Pharmaceuticals',
+    'CCI34': 'Crown Castle International',
+    'ICE34': 'Intercontinental Exchange',
+    'BSX34': 'Boston Scientific',
+    'SO34': 'The Southern Company',
+    'D34': 'Dominion Energy',
+    'DUK34': 'Duke Energy',
+    'CI34': 'Cigna',
+    'HUM34': 'Humana',
+    'ANTM34': 'Anthem',
+    'AON34': 'Aon',
+    'MMC34': 'Marsh & McLennan Companies',
+    'PGR34': 'The Progressive Corporation',
+    'TGT34': 'Target',
+    'DG34': 'Dollar General',
+    'EL34': 'The Estee Lauder Companies',
+    'CL34': 'Colgate-Palmolive',
+    'KMB34': 'Kimberly-Clark',
+    'ECL34': 'Ecolab',
+    'SHW34': 'The Sherwin-Williams Company',
+    'APD34': 'Air Products and Chemicals',
+    'NEM34': 'Newmont',
+    'FCX34': 'Freeport-McMoRan',
+    'WM34': 'Waste Management',
+    'RSG34': 'Republic Services',
+    'FDX34': 'FedEx',
+    'UPS34': 'United Parcel Service',
+    'DE34': 'Deere & Company',
+    'EMR34': 'Emerson Electric',
+    'ETN34': 'Eaton Corporation',
+    'ITW34': 'Illinois Tool Works',
+    'ROP34': 'Roper Technologies',
+    'AEP34': 'American Electric Power',
+    'EXC34': 'Exelon',
+    'SRE34': 'Sempra Energy',
+    'PEG34': 'Public Service Enterprise Group',
+    'XEL34': 'Xcel Energy',
+    'WEC34': 'WEC Energy Group',
+    'AWK34': 'American Water Works Company',
+    'ES34': 'Eversource Energy',
+    'EIX34': 'Edison International',
+    'FE34': 'FirstEnergy',
+    'PPL34': 'PPL Corporation',
+    'DTE34': 'DTE Energy',
+    'ETR34': 'Entergy',
+    'CMS34': 'CMS Energy',
+    'LNT34': 'Alliant Energy',
+    'ATO34': 'Atmos Energy',
+    'NI34': 'NiSource',
+    'CNP34': 'CenterPoint Energy',
+    'TRP34': 'TC Energy',
+    'ENB34': 'Enbridge',
+    'EPD34': 'Enterprise Products Partners',
+    'WMB34': 'The Williams Companies',
+    'KMI34': 'Kinder Morgan',
+    'OKE34': 'ONEOK',
+    'LNG34': 'Cheniere Energy',
+    'SLB34': 'Schlumberger',
+    'HAL34': 'Halliburton',
+    'BKR34': 'Baker Hughes',
+    'PSX34': 'Phillips 66',
+    'VLO34': 'Valero Energy',
+    'MPC34': 'Marathon Petroleum',
+    'OXY34': 'Occidental Petroleum',
+    'EOG34': 'EOG Resources',
+    'PXD34': 'Pioneer Natural Resources',
+    'COP34': 'ConocoPhillips',
+    'HES34': 'Hess',
+    'DVN34': 'Devon Energy',
+    'MRO34': 'Marathon Oil',
+    'AIG34': 'American International Group',
+    'PRU34': 'Prudential Financial',
+    'MET34': 'MetLife',
+    'ALL34': 'The Allstate Corporation',
+    'TRV34': 'The Travelers Companies',
+    'AFL34': 'Aflac',
+    'HIG34': 'The Hartford Financial Services Group',
+    'PFG34': 'Principal Financial Group',
+    'CINF34': 'Cincinnati Financial',
+    'LNC34': 'Lincoln National',
+    'RE34': 'Everest Re Group',
+    'WRB34': 'W. R. Berkley',
+    'GL34': 'Globe Life',
+    'BRO34': 'Brown & Brown',
+    'AJG34': 'Arthur J. Gallagher & Co.'
 }
 
 
@@ -2088,10 +2146,10 @@ NOMES_BDRS = {
 def buscar_dados_fundamentalistas(ticker_bdr):
     """
     Busca dados fundamentalistas com fallback em cascata:
-    1. Yahoo Finance com ticker US mapeado (empresa mãe)
-    2. Yahoo Finance com variantes do ticker (sufixo .SA removido, etc.)
-    3. OpenBB / FMP com chave configurada
-    4. BRAPI como último recurso
+    1. Yahoo Finance — empresa mãe (ticker US mapeado)
+    2. BRAPI módulos completos — BDR na B3 com financialData/summaryDetail
+    3. OpenBB / FMP — empresa mãe via API alternativa
+    4. BRAPI básico — último recurso (preço e volume apenas)
     """
     ticker_us = mapear_ticker_us(ticker_bdr)
 
@@ -2168,6 +2226,38 @@ def buscar_dados_fundamentalistas(ticker_bdr):
         else:
             det['market_cap'] = {'valor': None, 'pontos': 0, 'criterio': ''}
 
+        # ROE — Return on Equity (10 pontos)
+        roe = info.get('returnOnEquity')
+        if roe and isinstance(roe, (int, float)):
+            det['roe'] = {'valor': roe, 'pontos': 0, 'criterio': ''}
+            if roe > 0.20:    score += 10; det['roe'].update(pontos=10, criterio='Excelente (>20%)')
+            elif roe > 0.10:  score +=  5; det['roe'].update(pontos=5,  criterio='Bom (>10%)')
+            elif roe < 0:     score -=  5; det['roe'].update(pontos=-5, criterio='Negativo')
+            else:                          det['roe']['criterio'] = 'Regular (0-10%)'
+        else:
+            det['roe'] = {'valor': None, 'pontos': 0, 'criterio': ''}
+
+        # Margem de Lucro (8 pontos)
+        pm = info.get('profitMargins')
+        if pm and isinstance(pm, (int, float)):
+            det['profit_margin'] = {'valor': pm, 'pontos': 0, 'criterio': ''}
+            if pm > 0.20:    score += 8; det['profit_margin'].update(pontos=8, criterio='Excelente (>20%)')
+            elif pm > 0.10:  score += 4; det['profit_margin'].update(pontos=4, criterio='Boa (>10%)')
+            elif pm < 0:     score -= 5; det['profit_margin'].update(pontos=-5, criterio='Negativa')
+            else:                        det['profit_margin']['criterio'] = 'Regular (0-10%)'
+        else:
+            det['profit_margin'] = {'valor': None, 'pontos': 0, 'criterio': ''}
+
+        # PEG Ratio (5 pontos — penaliza crescimento caro)
+        peg = info.get('pegRatio')
+        if peg and isinstance(peg, (int, float)) and peg > 0:
+            det['peg'] = {'valor': peg, 'pontos': 0, 'criterio': ''}
+            if peg < 1:      score += 5; det['peg'].update(pontos=5,  criterio='Subavaliado (<1)')
+            elif peg <= 2:   score += 2; det['peg'].update(pontos=2,  criterio='Justo (1-2)')
+            else:            score -= 3; det['peg'].update(pontos=-3, criterio='Caro (>2)')
+        else:
+            det['peg'] = {'valor': None, 'pontos': 0, 'criterio': ''}
+
         score = max(0, min(100, score))
 
         return {
@@ -2180,7 +2270,15 @@ def buscar_dados_fundamentalistas(ticker_bdr):
             'market_cap':     det['market_cap']['valor'],
             'revenue_growth': det['revenue_growth']['valor'],
             'recomendacao':   det['recomendacao']['valor'],
+            'roe':            det['roe']['valor'],
+            'profit_margin':  det['profit_margin']['valor'],
+            'peg':            det['peg']['valor'],
             'setor':          info.get('sector', 'N/A'),
+            'industry':       info.get('industry', 'N/A'),
+            # Dados B3 quando disponíveis (BRAPI)
+            'volume_b3':      info.get('_volume_b3'),
+            'preco_b3':       info.get('_preco_b3'),
+            'variacao_b3':    info.get('_variacao_b3'),
         }
 
     # ------------------------------------------------------------------
@@ -2248,9 +2346,23 @@ def buscar_dados_fundamentalistas(ticker_bdr):
         pass
 
     # ------------------------------------------------------------------
+    # TENTATIVA 2: BRAPI módulos completos — financialData/summaryDetail
+    # Dados diretamente do BDR listado na B3 com métricas fundamentais.
     # ------------------------------------------------------------------
-    # TENTATIVA 3: OpenBB / FMP — empresa mãe
+    try:
+        info_brapi_full = buscar_dados_brapi_completo(ticker_bdr)
+        resultado = _score_from_yf_info(
+            info_brapi_full,
+            f'BRAPI (B3) — {ticker_bdr}',
+            ticker_bdr,
+        )
+        if resultado:
+            return resultado
+    except Exception:
+        pass
+
     # ------------------------------------------------------------------
+    # TENTATIVA 3: OpenBB / FMP — empresa mãe via API alternativa
     # ------------------------------------------------------------------
     try:
         info_obb = buscar_dados_openbb(ticker_us)
@@ -2261,16 +2373,14 @@ def buscar_dados_fundamentalistas(ticker_bdr):
         pass
 
     # ------------------------------------------------------------------
-    # ------------------------------------------------------------------
-    # TENTATIVA 4: BRAPI — BDR na B3 (último recurso)
-    # ------------------------------------------------------------------
+    # TENTATIVA 4: BRAPI básico — preço e volume apenas (último recurso)
     # ------------------------------------------------------------------
     try:
         dados_brapi = buscar_dados_brapi(ticker_bdr)
         if dados_brapi:
             score, detalhes = calcular_score_brapi(dados_brapi)
             return {
-                'fonte': 'BRAPI (BDR na B3)',
+                'fonte': 'BRAPI básico (B3)',
                 'ticker_fonte': ticker_bdr,
                 'score': score,
                 'detalhes': detalhes,
@@ -2279,8 +2389,14 @@ def buscar_dados_fundamentalistas(ticker_bdr):
                 'market_cap': dados_brapi.get('market_cap'),
                 'revenue_growth': None,
                 'recomendacao': None,
+                'roe': None,
+                'profit_margin': None,
+                'peg': None,
                 'setor': dados_brapi.get('setor', 'N/A'),
+                'industry': 'N/A',
                 'volume_b3': dados_brapi.get('volume'),
+                'preco_b3': dados_brapi.get('preco'),
+                'variacao_b3': dados_brapi.get('variacao'),
             }
     except Exception:
         pass
