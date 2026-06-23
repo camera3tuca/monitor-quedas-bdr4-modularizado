@@ -884,6 +884,7 @@ BDR_TO_US_MAP = {
     'GL34': 'GL',
     'BRO34': 'BRO',
     'AJG34': 'AJG'
+
 }
 
 
@@ -2139,6 +2140,7 @@ NOMES_BDRS = {
     'GL34': 'Globe Life',
     'BRO34': 'Brown & Brown',
     'AJG34': 'Arthur J. Gallagher & Co.'
+
 }
 
 

@@ -231,17 +231,7 @@ with st.expander("📚 Guia dos Indicadores - Entenda os Sinais", expanded=False
 
 st.markdown("---")
 
-col_btn1, col_btn2 = st.columns([2, 10])
-with col_btn1:
-    btn_atualizar = st.button("🔄 Atualizar Análise", type="primary")
-with col_btn2:
-    btn_limpar = st.button("🗑️ Limpar Cache", help="Limpe o cache caso os gráficos fiquem travados em dias anteriores")
-
-if btn_limpar:
-    st.cache_data.clear()
-    st.rerun()
-
-if btn_atualizar:
+if st.button("🔄 Atualizar Análise", type="primary"):
     buscar_dados.clear()
     with st.spinner("Conectando à API e baixando dados..."):
         # Usar dicionário local de BDRs em vez de buscar da BRAPI
