@@ -27,8 +27,7 @@ PERIODO = "1y"  # 1 ano para ter dados suficientes para EMA200 (~252 dias úteis
 TERMINACOES_BDR = ('31', '32', '33', '34', '35', '39')
 
 # Token BRAPI para dados alternativos
-import streamlit as st
-BRAPI_TOKEN = st.secrets.get("BRAPI_TOKEN", "iExnKM1xcbQcYL3cNPhPQ3")  # Token gratuito da BRAPI
+BRAPI_TOKEN = "iExnKM1xcbQcYL3cNPhPQ3"  # Token gratuito da BRAPI
 
 # =============================================================================
 # FUNÇÕES DE BUSCA E TRADUÇÃO DE NOTÍCIAS
@@ -4324,8 +4323,7 @@ def calcular_score_brapi(dados_brapi):
 
     return max(0, min(100, score)), detalhes
 
-import streamlit as st
-FMP_API_KEY = st.secrets.get("FMP_API_KEY", "tBsRam74Ac6bZRWS3C8HY83C6not17Uh")
+FMP_API_KEY = "tBsRam74Ac6bZRWS3C8HY83C6not17Uh"
 
 def buscar_dados_openbb(ticker_us):
     """
@@ -5338,55 +5336,17 @@ def buscar_dados_fundamentalistas(ticker_bdr):
 
 # --- FUNÇÕES ---
 
-import time
-_LOTE = 50      # tickers por lote — evita rate limit do Yahoo Finance
-
 @st.cache_data(ttl=1800)
 def buscar_dados(tickers):
     if not tickers: return pd.DataFrame()
     sa_tickers = [f"{t}.SA" for t in tickers]
     try:
-        partes = []
-        for i in range(0, len(sa_tickers), _LOTE):
-            lote = sa_tickers[i:i + _LOTE]
-            try:
-                parte = yf.download(
-                    lote, period=PERIODO, auto_adjust=True,
-                    progress=False, timeout=60, threads=False,
-                )
-                if not parte.empty:
-                    partes.append(parte)
-            except Exception:
-                pass
-            if i + _LOTE < len(sa_tickers):
-                time.sleep(1)
-
-        if not partes:
-            return pd.DataFrame()
-
-        df = pd.concat(partes, axis=1) if len(partes) > 1 else partes[0]
-
+        # Mantendo o método que você gosta (rápido)
+        df = yf.download(sa_tickers, period=PERIODO, auto_adjust=True, progress=False, timeout=60)
         if df.empty: return pd.DataFrame()
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = pd.MultiIndex.from_tuples([(c[0], c[1].replace(".SA", "")) for c in df.columns])
-        df = df.dropna(axis=1, how='all')
-
-        # Preencher dados faltantes para BDRs ilíquidas
-        idx = pd.IndexSlice
-        if isinstance(df.columns, pd.MultiIndex):
-            for col in ['Close', 'High', 'Low', 'Open']:
-                if col in df.columns.levels[0]:
-                    df.loc[:, idx[col, :]] = df.loc[:, idx[col, :]].ffill()
-            if 'Volume' in df.columns.levels[0]:
-                df.loc[:, idx['Volume', :]] = df.loc[:, idx['Volume', :]].fillna(0)
-        else:
-            for col in ['Close', 'High', 'Low', 'Open']:
-                if col in df.columns:
-                    df[col] = df[col].ffill()
-            if 'Volume' in df.columns:
-                df['Volume'] = df['Volume'].fillna(0)
-
-        return df
+        return df.dropna(axis=1, how='all')
     except Exception: return pd.DataFrame()
 
 @st.cache_data(ttl=1800)
@@ -6237,7 +6197,6 @@ with st.expander("📚 Guia dos Indicadores - Entenda os Sinais", expanded=False
 st.markdown("---")
 
 if st.button("🔄 Atualizar Análise", type="primary"):
-    buscar_dados.clear()
     with st.spinner("Conectando à API e baixando dados..."):
         # Usar dicionário local de BDRs em vez de buscar da BRAPI
         lista_bdrs = list(NOMES_BDRS.keys())
