@@ -2,6 +2,13 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import yfinance as yf
+import requests_cache
+
+
+# Configura cache para o Yahoo Finance
+session = requests_cache.CachedSession('yfinance.cache')
+session.headers['User-agent'] = 'Mozilla/5.0'
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 import requests
