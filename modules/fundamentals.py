@@ -203,7 +203,7 @@ BDR_TO_US_MAP = {
     'BKWB39': 'BKWB',
     'BKXI39': 'BKXI',
     'BLAK34': 'BLAK',
-    'BLBT39': 'BLBT',
+    'BLBT39': 'LIT',
     'BLPX39': 'BLPX',
     'BLQD39': 'BLQD',
     'BMTU39': 'BMTU',
