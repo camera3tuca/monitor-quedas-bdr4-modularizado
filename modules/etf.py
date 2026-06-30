@@ -9,7 +9,7 @@ import pytz
 import warnings
 import re
 
-from modules.fundamentals import mapear_ticker_us, NOMES_BDRS, FMP_API_KEY
+from modules.fundamentals import mapear_ticker_us, NOMES_BDRS, FMP_API_KEY, buscar_dados_brapi
 
 
 def eh_etf(ticker_bdr):
@@ -298,7 +298,52 @@ def buscar_dados_etf(ticker_bdr):
         if resultado:
             return resultado
 
+    # ── Tentativa 6: BRAPI (B3) — último recurso, dados básicos do fundo ─────
+    resultado = _buscar_etf_brapi(ticker_bdr)
+    if resultado:
+        return resultado
+
     return {'erro': f'Não foi possível obter dados de ETF para {ticker_bdr} (US: {ticker_us}).'}
+
+
+def _buscar_etf_brapi(ticker_bdr):
+    """Último fallback: dados básicos da BDR de ETF na B3, via BRAPI.
+
+    A BRAPI só devolve cotação (sem composição/setores), então o painel mostra
+    nome, preço, variação e volume na B3 — em reais — quando Yahoo e FMP não
+    têm o fundo. Retorna no mesmo formato dos demais ou ``None``.
+    """
+    try:
+        d = buscar_dados_brapi(ticker_bdr)
+        if not d:
+            return None
+        preco = d.get('preco')
+        if not (preco or d.get('nome')):
+            return None
+        return {
+            'erro': None,
+            'ticker_fonte': f'{ticker_bdr} (BRAPI/B3)',
+            'nome': d.get('nome') or ticker_bdr,
+            'categoria': d.get('setor') or 'N/A',
+            'familia_fundo': 'N/A',
+            'patrimonio': d.get('market_cap'),
+            'expense_ratio': None,
+            'ytd_return': None,
+            'yield_div': None,
+            'nav': None,
+            'preco': preco,
+            'variacao_dia': d.get('variacao'),
+            'volume': d.get('volume'),
+            'beta': None,
+            'max_52s': None,
+            'min_52s': None,
+            'top_holdings': [],
+            'setores': [],
+            'descricao': '',
+            'moeda': 'R$',  # cotação da BDR na B3, em reais
+        }
+    except Exception:
+        return None
 
 
 def _buscar_etf_openbb(ticker_us, ticker_bdr):
@@ -399,6 +444,7 @@ def _buscar_etf_openbb(ticker_us, ticker_bdr):
             'top_holdings': top_holdings,
             'setores': setores,
             'descricao': descricao,
+            'moeda': '$',
         }
     except Exception:
         return None
@@ -480,6 +526,7 @@ def _montar_resultado(t, info, ticker_fonte):
         'top_holdings': top_holdings,
         'setores': setores,
         'descricao': info.get('longBusinessSummary', ''),
+        'moeda': '$',
     }
 
 
@@ -511,6 +558,7 @@ def renderizar_painel_etf(dados, ticker_bdr, empresa):
         top_holdings  = dados.get('top_holdings') or []
         setores       = dados.get('setores') or []
         descricao     = dados.get('descricao', '')
+        moeda         = dados.get('moeda', '$')
 
         # ── Cabeçalho ─────────────────────────────────────────────────────────
         st.markdown(f"""
@@ -545,7 +593,7 @@ def renderizar_painel_etf(dados, ticker_bdr, empresa):
                     <div style='font-size:0.65rem;font-weight:700;color:#94a3b8;
                                 text-transform:uppercase;'>Preço (Fundo)</div>
                     <div style='font-size:1.3rem;font-weight:900;color:#1e293b;'>
-                        ${preco:.2f}</div>
+                        {moeda}{preco:.2f}</div>
                     <div style='font-size:0.85rem;font-weight:700;color:{cor_v};'>{var_str}</div>
                 </div>""", unsafe_allow_html=True)
             else:
@@ -556,9 +604,9 @@ def renderizar_painel_etf(dados, ticker_bdr, empresa):
             patrimonio_str = 'N/A'
             if patrimonio:
                 if patrimonio >= 1e9:
-                    patrimonio_str = f"${patrimonio/1e9:.2f}B"
+                    patrimonio_str = f"{moeda}{patrimonio/1e9:.2f}B"
                 else:
-                    patrimonio_str = f"${patrimonio/1e6:.1f}M"
+                    patrimonio_str = f"{moeda}{patrimonio/1e6:.1f}M"
             st.markdown(f"""
             <div style='background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;
                         padding:0.85rem;text-align:center;min-height:105px;
