@@ -21,9 +21,9 @@ def buscar_dados_tradingview(ticker_us, ticker_bdr=''):
     inspirada no sistema de sinais do TradingView Screener.
     """
     try:
-        import yfinance as yf
+        from modules.yf_session import criar_ticker
 
-        t    = yf.Ticker(f'{ticker_us}')
+        t    = criar_ticker(f'{ticker_us}')
         hist = t.history(period='1y', interval='1d', auto_adjust=True)
         if hist.empty:
             return {'erro': f'Ticker {ticker_us} não encontrado no yfinance.'}
@@ -297,9 +297,9 @@ def buscar_peers_tradingview(setor, ticker_us_excluir, top_n=5):
 
     peers = []
     try:
-        import yfinance as yf
-        dfs = yf.download(candidatos, period='5d', interval='1d',
-                          auto_adjust=True, progress=False, timeout=15)
+        from modules.yf_session import baixar as _yf_baixar
+        dfs = _yf_baixar(candidatos, period='5d', interval='1d',
+                         auto_adjust=True, progress=False, timeout=15)
         if dfs.empty:
             return []
         if isinstance(dfs.columns, pd.MultiIndex):

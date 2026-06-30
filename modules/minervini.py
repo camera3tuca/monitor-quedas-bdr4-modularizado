@@ -16,9 +16,9 @@ import re
 def _calcular_minervini_cached(ticker):
     """Wrapper cacheado para calcular_minervini."""
     try:
-        import yfinance as yf
-        df_raw = yf.download(f"{ticker}.SA", period='1y', interval='1d',
-                             auto_adjust=True, progress=False, timeout=30)
+        from modules.yf_session import baixar as _yf_baixar
+        df_raw = _yf_baixar(f"{ticker}.SA", period='1y', interval='1d',
+                            auto_adjust=True, progress=False, timeout=30)
         if df_raw is None or df_raw.empty:
             return {'erro': 'Sem dados para análise Minervini.'}
         if isinstance(df_raw.columns, pd.MultiIndex):
@@ -39,8 +39,9 @@ def _calcular_minervini_cached(ticker):
 def _buscar_ibov():
     """Baixa o IBOV para usar como benchmark de Relative Strength."""
     try:
-        df = yf.download('^BVSP', period='1y', interval='1d',
-                         auto_adjust=True, progress=False, timeout=30)
+        from modules.yf_session import baixar as _yf_baixar
+        df = _yf_baixar('^BVSP', period='1y', interval='1d',
+                        auto_adjust=True, progress=False, timeout=30)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
         return df['Close'].dropna()

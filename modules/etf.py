@@ -61,8 +61,6 @@ ETF_TICKER_CORRECAO = {
     'BEFA39': 'EFA',
     'BEFG39': 'EFG',
     'BEFV39': 'EFV',
-    'BEGD39': 'ESGD',
-    'BEGE39': 'ESGE',
     'BEGU39': 'ESGU',
     'BEIS39': 'EIS',
     'BEMV39': 'EEMV',
@@ -92,7 +90,6 @@ ETF_TICKER_CORRECAO = {
     'BGWH39': 'DGRO',
     'BHEF39': 'HEFA',
     'BHER39': 'HERO',
-    'BHYC39': 'SHYG',
     'BHYG39': 'HYG',
     'BIAI39': 'IAI',
     'BIAU39': 'IAU',
@@ -247,7 +244,8 @@ def buscar_dados_etf(ticker_bdr):
     def _tentar_ticker(tk):
         """Tenta buscar dados de fundo para um ticker específico."""
         try:
-            t = yf.Ticker(tk)
+            from modules.yf_session import criar_ticker
+            t = criar_ticker(tk)
             info = t.info or {}
             if not info or len(info) < 3:
                 return None

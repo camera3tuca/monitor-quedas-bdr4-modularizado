@@ -1,13 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import yfinance as yf
-import requests_cache
 
-
-# Configura cache para o Yahoo Finance
-session = requests_cache.CachedSession('yfinance.cache')
-session.headers['User-agent'] = 'Mozilla/5.0'
+from modules.yf_session import baixar as _yf_baixar
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -19,9 +14,11 @@ import xml.etree.ElementTree as ET
 import html as html_lib
 import re
 import time
+import random
 
 PERIODO = "1y"  # 1 ano para ter dados suficientes para EMA200 (~252 dias úteis)
-_LOTE = 50      # tickers por lote — evita rate limit do Yahoo Finance
+_LOTE = 40      # tickers por lote — lotes menores reduzem o rate limit do Yahoo
+_PAUSA_LOTE = 2.0  # pausa-base (s) entre lotes; jitter aleatório é somado
 
 
 @st.cache_data(ttl=1800)
@@ -33,16 +30,18 @@ def buscar_dados(tickers):
         for i in range(0, len(sa_tickers), _LOTE):
             lote = sa_tickers[i:i + _LOTE]
             try:
-                parte = yf.download(
+                # baixar() faz retry com backoff exponencial em rate limit,
+                # então um lote bloqueado não é mais descartado de imediato.
+                parte = _yf_baixar(
                     lote, period=PERIODO, auto_adjust=True,
                     progress=False, timeout=60, threads=False,
                 )
-                if not parte.empty:
+                if parte is not None and not parte.empty:
                     partes.append(parte)
             except Exception:
                 pass
             if i + _LOTE < len(sa_tickers):
-                time.sleep(1)
+                time.sleep(_PAUSA_LOTE + random.uniform(0, 1))
 
         if not partes:
             return pd.DataFrame()
@@ -84,7 +83,7 @@ def buscar_dados_horario(ticker):
     Retorna DataFrame com DatetimeIndex horário ou None se falhar.
     """
     try:
-        df = yf.download(
+        df = _yf_baixar(
             f"{ticker}.SA",
             period='60d',
             interval='60m',
@@ -143,7 +142,8 @@ def buscar_nomes_yahoo(tickers):
                     progresso_nomes.progress(min((i + 1) / total, 1.0),
                                             text=f"Buscando nomes... {i+1}/{total}")
 
-                ticker_yf = yf.Ticker(f"{ticker}.SA")
+                from modules.yf_session import criar_ticker
+                ticker_yf = criar_ticker(f"{ticker}.SA")
                 info = ticker_yf.info
 
                 # Tentar pegar o nome na ordem de preferência
