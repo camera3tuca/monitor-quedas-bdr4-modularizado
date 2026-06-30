@@ -678,13 +678,17 @@ def obter_historico_ticker(ticker):
 
 def plotar_grafico(df_ticker, ticker, empresa, rsi, is_val,
                    timeframe='Diário', zoom_periods=None, tipo_grafico='Linha',
-                   df_horario=None):
+                   df_horario=None, preco_atual=None, emas_atual=None):
     """
     Plota o gráfico técnico principal com suporte a:
       - timeframe  : 'Horário (60min)' | 'Diário' | 'Semanal' | 'Mensal'
       - zoom_periods: número de barras a exibir (None = tudo)
       - tipo_grafico: 'Linha' | 'Candlestick'
       - df_horario : DataFrame com dados reais de 60min (opcional, usado no timeframe horário)
+      - preco_atual / emas_atual: preço e EMAs ATUAIS do screener (TradingView). Quando
+        informados, o status de tendência no título usa esses valores — a mesma base do
+        filtro de EMAs — em vez do último fechamento do yfinance (que para BDRs ilíquidas
+        pode estar defasado). As linhas do gráfico continuam vindo do histórico yfinance.
     """
     import matplotlib.dates as mdates
     from matplotlib.patches import Rectangle
@@ -856,23 +860,36 @@ def plotar_grafico(df_ticker, ticker, empresa, rsi, is_val,
         ax1.scatter([datas[-1]], [close.iloc[-1]], color='#e74c3c',
                     s=40, zorder=6)
 
-    # Tendência atual
+    # Tendência atual — prioriza os valores ATUAIS do screener (TradingView), que
+    # são a mesma base do filtro de EMAs; cai para o último valor do yfinance quando
+    # não informados (mantém o status coerente com a tabela e o filtro).
     ult_close = close.iloc[-1]
     ult_ema20 = ema20.iloc[-1]
     ult_ema50  = ema50.reindex(datas).iloc[-1]  if ema50  is not None else None
     ult_ema200 = ema200.reindex(datas).iloc[-1] if ema200 is not None else None
 
-    if ult_ema50 is not None and ult_ema200 is not None:
-        if ult_close > ult_ema20 > ult_ema50 > ult_ema200:
+    def _ou(valor, alternativa):
+        return valor if (valor is not None and pd.notna(valor)) else alternativa
+
+    _em = emas_atual or {}
+    pc   = _ou(preco_atual, ult_close)
+    e20  = _ou(_em.get('EMA20'),  ult_ema20)
+    e50  = _ou(_em.get('EMA50'),  ult_ema50)
+    e200 = _ou(_em.get('EMA200'), ult_ema200)
+
+    if e50 is not None and e200 is not None and pd.notna(e50) and pd.notna(e200):
+        if pc > e20 > e50 > e200:
             status = "🟢 Tendência Forte de Alta"
-        elif ult_close > ult_ema20 and ult_close > ult_ema50 and ult_close > ult_ema200:
+        elif pc > e20 and pc > e50 and pc > e200:
             status = "🟢 Acima das 3 EMAs"
-        elif ult_close < ult_ema20 and ult_close < ult_ema50 and ult_close < ult_ema200:
+        elif pc < e20 and pc < e50 and pc < e200:
             status = "🔴 Abaixo das 3 EMAs"
+        elif pc > e200:
+            status = "🟡 Mista (acima da EMA200)"
         else:
-            status = "🟡 Tendência Mista"
+            status = "🟡 Mista (abaixo da EMA200)"
     else:
-        status = "🟢 Acima EMA20" if ult_close > ult_ema20 else "🔴 Abaixo EMA20"
+        status = "🟢 Acima EMA20" if pc > e20 else "🔴 Abaixo EMA20"
 
     # Fibonacci mais próximo
     nivel_mais_proximo = min(fib_levels, key=lambda n: abs(ult_close - fib_levels[n]))
