@@ -449,7 +449,7 @@ if 'oportunidades' in st.session_state:
                         .map(estilizar_liquidez, subset=['Liquidez'])
             .format({
                 'Preco': 'R$ {:.2f}',
-                'Volume': '{:,.0f}',
+                'Volume': 'R$ {:,.0f}',
                 'Queda_Dia': '{:.2f}%',
                 'Gap': '{:.2f}%',
                 'IS': '{:.0f}',
@@ -463,7 +463,7 @@ if 'oportunidades' in st.session_state:
                 "Liquidez": st.column_config.NumberColumn("💧 Liq.", width="small",
                     help="Ranking de Liquidez 0-10 (🔴 baixa → 🟢 alta)"),
                 "IS": st.column_config.NumberColumn("I.S.", help="Índice de Sobrevenda"),
-                "Volume": st.column_config.NumberColumn("Vol.", help="Volume Financeiro"),
+                "Volume": st.column_config.NumberColumn("Vol. R$", help="Volume financeiro médio (R$/dia) ≈ volume × preço"),
                 "Score": st.column_config.ProgressColumn("Força", format="%d", min_value=0, max_value=10),
                 "Potencial": st.column_config.Column("Sinal"),
                 "Sinais": st.column_config.TextColumn("Sinais Técnicos", width="large")
@@ -488,6 +488,22 @@ if 'oportunidades' in st.session_state:
                 df_ticker = df_ticker.dropna() if df_ticker is not None else pd.DataFrame()
                 if df_ticker.empty:
                     raise ValueError(f"Sem histórico disponível para {ticker} (Yahoo pode ter bloqueado). Tente novamente em instantes.")
+
+                # Métricas do detalhe recalculadas a partir do MESMO histórico que
+                # alimenta o gráfico (yfinance), para que o gráfico e os números ao
+                # lado dele fiquem sempre consistentes. A tabela acima é o screener
+                # (TradingView) e pode divergir levemente por ser quase tempo real.
+                _last = df_ticker.iloc[-1]
+                _prev = df_ticker.iloc[-2] if len(df_ticker) >= 2 else _last
+                _preco_ant = float(_prev.get('Close')) if pd.notna(_prev.get('Close')) else None
+                preco_det = float(_last.get('Close')) if pd.notna(_last.get('Close')) else None
+                queda_det = ((preco_det - _preco_ant) / _preco_ant * 100) if (preco_det and _preco_ant) else 0.0
+                gap_det = ((float(_last.get('Open')) - _preco_ant) / _preco_ant * 100) if (_preco_ant and pd.notna(_last.get('Open'))) else 0.0
+                rsi_det = float(_last.get('RSI14')) if pd.notna(_last.get('RSI14')) else 50.0
+                stoch_det = float(_last.get('Stoch_K')) if pd.notna(_last.get('Stoch_K')) else 50.0
+                is_det = ((100 - rsi_det) + (100 - stoch_det)) / 2
+                vol_fin_det = float(df_ticker['Volume'].tail(10).mean() or 0) * (preco_det or 0)
+                sinais_det, score_det, classif_det, expl_det = gerar_sinal(_last, df_ticker)
 
                 # ── Controles do gráfico ─────────────────────────────────────────
                 st.markdown("**⚙️ Configurações do Gráfico:**")
@@ -567,7 +583,7 @@ if 'oportunidades' in st.session_state:
                         if df_horario is None:
                             st.caption('⚠️ Dados horários indisponíveis — usando fallback diário.')
 
-                    fig = plotar_grafico(df_ticker, ticker, row['Empresa'], row['RSI14'], row['IS'],
+                    fig = plotar_grafico(df_ticker, ticker, row['Empresa'], rsi_det, is_det,
                                          timeframe=timeframe_sel,
                                          zoom_periods=zoom_final,
                                          tipo_grafico=tipo_graf,
@@ -575,7 +591,7 @@ if 'oportunidades' in st.session_state:
                     st.pyplot(fig)
 
                 with col2:
-                    potencial = row['Potencial']
+                    potencial = classif_det
 
                     # Card de potencial
                     if "Alta" in potencial:
@@ -599,15 +615,15 @@ if 'oportunidades' in st.session_state:
                     </div>
                     """, unsafe_allow_html=True)
 
-                    st.metric("💰 Preço Atual", f"R$ {row['Preco']:.2f}")
-                    st.metric("📉 Queda no Dia", f"{row['Queda_Dia']:.2f}%", delta_color="inverse")
-                    st.metric("🎯 I.S. (Sobrevenda)", f"{row['IS']:.0f}/100")
+                    st.metric("💰 Preço Atual", f"R$ {preco_det:.2f}")
+                    st.metric("📉 Queda no Dia", f"{queda_det:.2f}%", delta_color="inverse")
+                    st.metric("🎯 I.S. (Sobrevenda)", f"{is_det:.0f}/100")
 
-                    if row['Gap'] < -1:
-                        st.metric("⚡ Gap de Abertura", f"{row['Gap']:.2f}%", delta_color="inverse")
+                    if gap_det < -1:
+                        st.metric("⚡ Gap de Abertura", f"{gap_det:.2f}%", delta_color="inverse")
 
-                    st.markdown(f"**⭐ Score:** {row['Score']}/10")
-                    st.markdown(f"**📊 Volume:** {row['Volume']:,.0f}")
+                    st.markdown(f"**⭐ Score:** {score_det}/10")
+                    st.markdown(f"**📊 Volume (R$/dia):** R$ {vol_fin_det:,.0f}")
 
                     # Sinais técnicos
                     st.markdown("""
@@ -617,10 +633,10 @@ if 'oportunidades' in st.session_state:
                         </p>
                     </div>
                     """, unsafe_allow_html=True)
-                    st.markdown(f"<p style='font-size: 0.85rem; color: #475569;'>{row['Sinais']}</p>", unsafe_allow_html=True)
+                    st.markdown(f"<p style='font-size: 0.85rem; color: #475569;'>{', '.join(sinais_det) if sinais_det else '-'}</p>", unsafe_allow_html=True)
 
                     # Explicações didáticas
-                    if 'Explicacoes' in row and row['Explicacoes']:
+                    if expl_det:
                         st.markdown("""
                         <div style='background: #fef3c7; padding: 0.75rem; border-radius: 6px; margin-top: 1rem;'>
                             <p style='margin: 0; font-weight: 600; color: #92400e; font-size: 0.9rem;'>
@@ -628,7 +644,7 @@ if 'oportunidades' in st.session_state:
                             </p>
                         </div>
                         """, unsafe_allow_html=True)
-                        for explicacao in row['Explicacoes']:
+                        for explicacao in expl_det:
                             st.markdown(f"<p style='font-size: 0.82rem; color: #92400e; margin: 0.3rem 0;'>• {explicacao}</p>", unsafe_allow_html=True)
 
             except Exception as e:
