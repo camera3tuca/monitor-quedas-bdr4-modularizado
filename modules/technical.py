@@ -447,11 +447,15 @@ def analisar_oportunidades(df_calc, mapa_nomes):
             nome_completo = mapa_nomes.get(ticker, ticker)
             nome_curto = _gerar_nome_curto(ticker, nome_completo)
 
+            # Volume financeiro (R$/dia) — coerente com o caminho TradingView
+            _vol_base = vol_medio if (pd.notna(vol_medio) and vol_medio > 0) else (volume or 0)
+            volume_financeiro = float(_vol_base or 0) * float(preco or 0)
+
             resultados.append({
                 'Ticker': ticker,
                 'Empresa': nome_curto,
                 'Preco': preco,
-                'Volume': volume,
+                'Volume': volume_financeiro,
                 'Queda_Dia': queda_dia,
                 'Gap': gap,
                 'IS': is_index,
@@ -577,6 +581,12 @@ def buscar_oportunidades_tv(lista_bdrs, mapa_nomes):
             vol_medio = _f(row.get('average_volume_10d_calc'), 0.0)
             gap = _f(row.get('gap'), 0.0)
 
+            # Volume FINANCEIRO (R$/dia): volume médio de 10d (ou do dia) × preço.
+            # Mais legível e coerente com o ranking de liquidez do que a contagem
+            # de ações, que para BDRs costuma ser baixíssima.
+            vol_base = vol_medio if vol_medio > 0 else volume
+            volume_financeiro = vol_base * preco
+
             # Reaproveita gerar_sinal montando a linha com os campos esperados.
             # Sem histórico, o sinal de Fibonacci é ignorado (calcular_fibonacci(None)).
             linha = pd.Series({
@@ -599,7 +609,7 @@ def buscar_oportunidades_tv(lista_bdrs, mapa_nomes):
                 'Ticker': ticker,
                 'Empresa': nome_curto,
                 'Preco': preco,
-                'Volume': volume,
+                'Volume': volume_financeiro,
                 'Queda_Dia': queda_dia,
                 'Gap': gap,
                 'IS': is_index,
