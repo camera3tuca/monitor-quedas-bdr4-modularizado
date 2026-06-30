@@ -9,7 +9,7 @@ import pytz
 import warnings
 import re
 
-from modules.fundamentals import mapear_ticker_us, NOMES_BDRS
+from modules.fundamentals import mapear_ticker_us, NOMES_BDRS, FMP_API_KEY
 
 
 def eh_etf(ticker_bdr):
@@ -292,7 +292,116 @@ def buscar_dados_etf(ticker_bdr):
     except Exception:
         pass
 
+    # ── Tentativa 5: OpenBB / FMP — fonte alternativa ao Yahoo ───────────────
+    for tk in candidatos:
+        resultado = _buscar_etf_openbb(tk, ticker_bdr)
+        if resultado:
+            return resultado
+
     return {'erro': f'Não foi possível obter dados de ETF para {ticker_bdr} (US: {ticker_us}).'}
+
+
+def _buscar_etf_openbb(ticker_us, ticker_bdr):
+    """Fallback de dados de ETF via OpenBB/FMP quando o Yahoo não tem o fundo.
+
+    Retorna um dict no MESMO formato de ``_montar_resultado`` (composição,
+    setores e métricas de fundo) ou ``None`` se a FMP também não tiver dados.
+    """
+    try:
+        from openbb import obb
+        try:
+            obb.user.credentials.fmp_api_key = FMP_API_KEY
+        except Exception:
+            pass
+
+        def _pct(valor):
+            """Normaliza peso (fração 0-1 ou percentual) para percentual."""
+            try:
+                v = float(valor)
+            except (TypeError, ValueError):
+                return None
+            return v * 100 if abs(v) <= 1 else v
+
+        nome = categoria = expense_ratio = patrimonio = nav = None
+        descricao = ''
+
+        # --- Info / perfil do fundo ---
+        try:
+            inf = obb.etf.info(symbol=ticker_us, provider='fmp')
+            if inf and inf.results:
+                r = inf.results[0]
+                nome          = getattr(r, 'name', None)
+                categoria     = getattr(r, 'asset_class', None) or getattr(r, 'category', None)
+                expense_ratio = getattr(r, 'expense_ratio', None)
+                patrimonio    = getattr(r, 'aum', None) or getattr(r, 'total_assets', None)
+                nav           = getattr(r, 'nav', None)
+                descricao     = getattr(r, 'description', '') or ''
+        except Exception:
+            pass
+
+        # --- Top holdings ---
+        top_holdings = []
+        try:
+            hold = obb.etf.holdings(symbol=ticker_us, provider='fmp')
+            if hold and hold.results:
+                for h in hold.results[:10]:
+                    pct = _pct(getattr(h, 'weight', None))
+                    if pct is None:
+                        continue
+                    sym = getattr(h, 'symbol', '') or ''
+                    top_holdings.append({
+                        'symbol': sym,
+                        'name': getattr(h, 'name', '') or sym,
+                        'pct': pct,
+                    })
+        except Exception:
+            pass
+
+        # --- Setores ---
+        setores = []
+        try:
+            sec = obb.etf.sectors(symbol=ticker_us, provider='fmp')
+            if sec and sec.results:
+                for s in sec.results:
+                    nome_s = getattr(s, 'sector', None)
+                    pct = _pct(getattr(s, 'weight', None))
+                    if not nome_s or pct is None or pct <= 0:
+                        continue
+                    setores.append({'setor': str(nome_s).replace('_', ' ').title(), 'pct': pct})
+                setores.sort(key=lambda x: x['pct'], reverse=True)
+        except Exception:
+            pass
+
+        # Sem nada de útil → deixa o chamador exibir o aviso padrão
+        if not (nome or top_holdings or setores or patrimonio or nav or expense_ratio):
+            return None
+
+        if expense_ratio and expense_ratio < 1:
+            expense_ratio = expense_ratio * 100
+
+        return {
+            'erro': None,
+            'ticker_fonte': f'{ticker_us} (FMP)',
+            'nome': nome or ticker_us,
+            'categoria': categoria or 'N/A',
+            'familia_fundo': 'N/A',
+            'patrimonio': patrimonio,
+            'expense_ratio': expense_ratio,
+            'ytd_return': None,
+            'yield_div': None,
+            'nav': nav,
+            'preco': None,
+            'variacao_dia': None,
+            'volume': None,
+            'beta': None,
+            'max_52s': None,
+            'min_52s': None,
+            'top_holdings': top_holdings,
+            'setores': setores,
+            'descricao': descricao,
+        }
+    except Exception:
+        return None
 
 
 def _montar_resultado(t, info, ticker_fonte):
@@ -380,7 +489,8 @@ def renderizar_painel_etf(dados, ticker_bdr, empresa):
 
         if dados.get('erro'):
             st.warning(f"⚠️ {dados['erro']}")
-            st.caption("Algumas ETFs não disponibilizam dados completos via Yahoo Finance.")
+            st.caption("Esta ETF não disponibiliza dados de composição via Yahoo Finance nem OpenBB/FMP "
+                       "(comum em ETPs de cripto e fundos listados fora dos EUA).")
             return
 
         nome          = dados.get('nome', ticker_bdr)
