@@ -188,7 +188,7 @@ def renderizar_painel_flow(df_ticker: pd.DataFrame, ticker: str, empresa: str):
             {"verde": "🟢 Compra", "amarelo": "🟡 Aguardar", "vermelho": "🔴 Venda"}
         )
         hist.index = hist.index.strftime("%d/%m/%Y")
-        st.dataframe(hist.iloc[::-1], use_container_width=True)
+        st.dataframe(hist.iloc[::-1], width="stretch")
 
     st.caption(
         "⚠️ Aproximação de fluxo de ordens via OHLCV público. "

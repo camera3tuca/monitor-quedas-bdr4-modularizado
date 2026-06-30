@@ -37,6 +37,12 @@ st.set_page_config(
 
 warnings.filterwarnings('ignore')
 
+# Silencia o ruído do yfinance no log (ex.: "possibly delisted", "HTTP Error 404")
+# para BDRs sem dado no Yahoo. Como o scanner principal usa o TradingView, esses
+# avisos são apenas de buscas pontuais (detalhe de 1 ticker) e já são tratados na UI.
+import logging
+logging.getLogger('yfinance').setLevel(logging.CRITICAL)
+
 plt.style.use('seaborn-v0_8-darkgrid')
 
 sns.set_palette("husl")
@@ -940,7 +946,7 @@ if 'oportunidades' in st.session_state:
                 setor_news = fund_data.get('setor', '') or ''
             # Pega variação do dia se disponível na linha da tabela
             try:
-                variacao_dia_news = float(row.get('Var. Dia', row.get('Variacao', 0)) or 0)
+                variacao_dia_news = float(row.get('Queda_Dia', 0) or 0)
             except Exception:
                 variacao_dia_news = None
 
@@ -953,7 +959,7 @@ if 'oportunidades' in st.session_state:
                     unsafe_allow_html=True
                 )
             with hc2:
-                if st.button("🔄 Atualizar", key=f"btn_news_{ticker}", use_container_width=True):
+                if st.button("🔄 Atualizar", key=f"btn_news_{ticker}", width="stretch"):
                     buscar_noticias_com_traducao.clear()
 
             with st.spinner("Buscando notícias recentes..."):
