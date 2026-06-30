@@ -129,7 +129,7 @@ BDR_TO_US_MAP = {
     'BERK34': 'BRK-B',
     'BEWA39': 'BEWA',
     'BEWC39': 'BEWC',
-    'BEWD39': 'BEWD',
+    'BEWD39': 'EWD',
     'BEWG39': 'BEWG',
     'BEWH39': 'BEWH',
     'BEWJ39': 'BEWJ',
