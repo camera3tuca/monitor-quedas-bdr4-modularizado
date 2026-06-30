@@ -18,9 +18,9 @@ import re
 def _executar_agente_rl_cached(ticker, episodes=8, window_size=5):
     """Wrapper cacheado para executar_agente_rl — evita re-treino a cada interação."""
     try:
-        import yfinance as yf
-        df_raw = yf.download(f"{ticker}.SA", period='1y', interval='1d',
-                             auto_adjust=True, progress=False, timeout=30)
+        from modules.yf_session import baixar as _yf_baixar
+        df_raw = _yf_baixar(f"{ticker}.SA", period='1y', interval='1d',
+                            auto_adjust=True, progress=False, timeout=30)
         if df_raw is None or df_raw.empty:
             return {'erro': 'Sem dados para o agente RL.'}
         if isinstance(df_raw.columns, pd.MultiIndex):

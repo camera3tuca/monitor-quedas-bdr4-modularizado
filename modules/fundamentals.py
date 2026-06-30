@@ -2253,9 +2253,10 @@ def buscar_dados_fundamentalistas(ticker_bdr):
                     ):
                         tickers_encontrados.append(symbol)
 
+                from modules.yf_session import criar_ticker
                 for t in tickers_encontrados[:3]:  # testa até 3 candidatos
                     try:
-                        info = yf.Ticker(t).info
+                        info = criar_ticker(t).info
                         resultado = _score_from_yf_info(info, f'Yahoo Finance — {t} ({nome_limpo})', t)
                         if resultado:
                             return resultado
@@ -2274,9 +2275,10 @@ def buscar_dados_fundamentalistas(ticker_bdr):
         if '-' in ticker_us:
             tickers_tentar.append(ticker_us.replace('-', '.'))
 
+        from modules.yf_session import criar_ticker
         for t in tickers_tentar:
             try:
-                info = yf.Ticker(t).info
+                info = criar_ticker(t).info
                 resultado = _score_from_yf_info(info, f'Yahoo Finance — {t}', t)
                 if resultado:
                     return resultado
