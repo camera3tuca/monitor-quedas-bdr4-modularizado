@@ -17,8 +17,52 @@ import time
 import random
 
 PERIODO = "1y"  # 1 ano para ter dados suficientes para EMA200 (~252 dias úteis)
-_LOTE = 40      # tickers por lote — lotes menores reduzem o rate limit do Yahoo
-_PAUSA_LOTE = 2.0  # pausa-base (s) entre lotes; jitter aleatório é somado
+_LOTE = 40           # tickers por lote — lotes menores reduzem o rate limit do Yahoo
+_PAUSA_LOTE = 2.0    # pausa-base (s) entre lotes; jitter aleatório é somado
+_MAX_RODADAS = 3     # rodadas extras p/ tickers que faltaram (provável rate limit)
+_COOLDOWN_RODADA = 20.0  # cooldown-base (s) entre rodadas; cresce a cada rodada
+
+
+def _tickers_presentes(parte, lote):
+    """Conjunto de tickers (.SA) efetivamente retornados num DataFrame do yfinance."""
+    cols = parte.columns
+    if isinstance(cols, pd.MultiIndex):
+        return {c[1] for c in cols}
+    # Download de 1 ticker volta com colunas simples (sem o símbolo): se veio
+    # algo, esse único ticker foi obtido.
+    return {lote[0]} if len(lote) == 1 else set()
+
+
+def _baixar_em_lotes(sa_tickers):
+    """Baixa uma lista de tickers .SA em lotes sequenciais.
+
+    Retorna (partes, obtidos): a lista de DataFrames baixados e o conjunto de
+    tickers .SA que de fato retornaram dados. ``yf.download`` em lote não lança
+    exceção em rate limit — ele só devolve um DataFrame parcial — por isso a
+    detecção de faltantes é feita comparando o que voltou com o que foi pedido.
+    """
+    partes, obtidos = [], set()
+    for i in range(0, len(sa_tickers), _LOTE):
+        lote = sa_tickers[i:i + _LOTE]
+        try:
+            parte = _yf_baixar(
+                lote, period=PERIODO, auto_adjust=True,
+                progress=False, timeout=60, threads=False,
+            )
+            if parte is not None and not parte.empty:
+                parte = parte.dropna(axis=1, how='all')
+                if not parte.empty:
+                    # Normaliza download de 1 ticker para MultiIndex (field, TICKER)
+                    # para concatenar de forma consistente com os lotes maiores.
+                    if len(lote) == 1 and not isinstance(parte.columns, pd.MultiIndex):
+                        parte.columns = pd.MultiIndex.from_product([parte.columns, [lote[0]]])
+                    partes.append(parte)
+                    obtidos |= _tickers_presentes(parte, lote)
+        except Exception:
+            pass
+        if i + _LOTE < len(sa_tickers):
+            time.sleep(_PAUSA_LOTE + random.uniform(0, 1))
+    return partes, obtidos
 
 
 @st.cache_data(ttl=1800)
@@ -27,21 +71,17 @@ def buscar_dados(tickers):
     sa_tickers = [f"{t}.SA" for t in tickers]
     try:
         partes = []
-        for i in range(0, len(sa_tickers), _LOTE):
-            lote = sa_tickers[i:i + _LOTE]
-            try:
-                # baixar() faz retry com backoff exponencial em rate limit,
-                # então um lote bloqueado não é mais descartado de imediato.
-                parte = _yf_baixar(
-                    lote, period=PERIODO, auto_adjust=True,
-                    progress=False, timeout=60, threads=False,
-                )
-                if parte is not None and not parte.empty:
-                    partes.append(parte)
-            except Exception:
-                pass
-            if i + _LOTE < len(sa_tickers):
-                time.sleep(_PAUSA_LOTE + random.uniform(0, 1))
+        pendentes = list(sa_tickers)
+        for rodada in range(_MAX_RODADAS + 1):
+            novas, obtidos = _baixar_em_lotes(pendentes)
+            partes.extend(novas)
+            pendentes = [t for t in pendentes if t not in obtidos]
+            if not pendentes or rodada == _MAX_RODADAS:
+                break
+            # O que faltou é quase sempre rate limit (o Yahoo throttla os lotes
+            # finais). Espera o limite "esfriar" antes de tentar só os faltantes,
+            # com cooldown crescente a cada rodada.
+            time.sleep(_COOLDOWN_RODADA * (rodada + 1) + random.uniform(0, 3))
 
         if not partes:
             return pd.DataFrame()
