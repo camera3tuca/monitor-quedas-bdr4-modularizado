@@ -461,10 +461,198 @@ def analisar_oportunidades(df_calc, mapa_nomes):
                 'Score': score,
                 'Sinais': ", ".join(sinais) if sinais else "-",
                 'Explicacoes': explicacoes,
-                'Liquidez': int(ranking_liq)
+                'Liquidez': int(ranking_liq),
+                'EMA20': last.get('EMA20'),
+                'EMA50': last.get('EMA50'),
+                'EMA200': last.get('EMA200'),
             })
         except: continue
     return resultados
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Scanner em massa via TradingView (rápido, sem o bloqueio de IP do Yahoo)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Colunas do TradingView usadas no scanner. O TradingView já entrega os
+# indicadores calculados, então uma única requisição substitui o download de
+# centenas de tickers no Yahoo.
+_TV_CAMPOS = [
+    'name', 'description', 'close', 'change', 'gap', 'volume',
+    'average_volume_10d_calc', 'RSI', 'Stoch.K',
+    'MACD.macd', 'MACD.signal', 'BB.lower',
+    'EMA20', 'EMA50', 'EMA200',
+]
+
+
+def _liquidez_por_volume(vol_medio):
+    """Ranking de liquidez 0-10 a partir do volume médio (10 dias)."""
+    try:
+        vol_medio = float(vol_medio or 0)
+    except (TypeError, ValueError):
+        return 1
+    if vol_medio > 1_000_000: return 10
+    if vol_medio >   500_000: return 9
+    if vol_medio >   200_000: return 8
+    if vol_medio >   100_000: return 7
+    if vol_medio >    50_000: return 6
+    if vol_medio >    20_000: return 5
+    if vol_medio >    10_000: return 4
+    if vol_medio >     5_000: return 3
+    if vol_medio >     1_000: return 2
+    return 1
+
+
+def _f(valor, padrao=None):
+    """Converte para float com segurança (TradingView pode devolver None)."""
+    try:
+        if valor is None:
+            return padrao
+        return float(valor)
+    except (TypeError, ValueError):
+        return padrao
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def buscar_oportunidades_tv(lista_bdrs, mapa_nomes):
+    """Scanner em massa via TradingView — substitui o caminho yfinance.
+
+    Faz UMA requisição ao screener do mercado brasileiro, filtrando pelos
+    tickers de BDR informados, e devolve a MESMA lista de dicts de
+    ``analisar_oportunidades`` (já filtrada para quedas no dia).
+
+    Retorna ``None`` se a lib não existir ou a consulta falhar, para que o
+    chamador caia no fallback yfinance.
+    """
+    if not lista_bdrs:
+        return None
+    try:
+        from tradingview_screener import Query, col
+    except Exception:
+        return None
+
+    try:
+        lista_bdrs = list(lista_bdrs)
+        _, df = (
+            Query()
+            .select(*_TV_CAMPOS)
+            .where(col('name').isin(lista_bdrs))
+            .set_markets('brazil')
+            .limit(len(lista_bdrs) + 100)
+            .get_scanner_data()
+        )
+    except Exception:
+        return None
+
+    if df is None or df.empty:
+        return None
+
+    resultados = []
+    for _, row in df.iterrows():
+        try:
+            ticker = str(row.get('name', '')).split(':')[-1]
+            preco = _f(row.get('close'))
+            queda_dia = _f(row.get('change'))
+            if preco is None or queda_dia is None:
+                continue
+            if queda_dia >= 0:        # só quedas, como no caminho original
+                continue
+
+            rsi = _f(row.get('RSI'), 50.0)
+            stoch = _f(row.get('Stoch.K'), 50.0)
+            macd_hist = _f(row.get('MACD.macd'), 0.0) - _f(row.get('MACD.signal'), 0.0)
+            bb_lower = _f(row.get('BB.lower'))
+            volume = _f(row.get('volume'), 0.0)
+            vol_medio = _f(row.get('average_volume_10d_calc'), 0.0)
+            gap = _f(row.get('gap'), 0.0)
+
+            # Reaproveita gerar_sinal montando a linha com os campos esperados.
+            # Sem histórico, o sinal de Fibonacci é ignorado (calcular_fibonacci(None)).
+            linha = pd.Series({
+                'Close': preco,
+                'RSI14': rsi,
+                'Stoch_K': stoch,
+                'MACD_Hist': macd_hist,
+                'BB_Lower': bb_lower,
+            })
+            sinais, score, classificacao, explicacoes = gerar_sinal(linha, None)
+
+            is_index = ((100 - rsi) + (100 - stoch)) / 2
+            ranking_liq = _liquidez_por_volume(vol_medio)
+
+            nome_completo = (str(row.get('description') or '').strip()
+                             or mapa_nomes.get(ticker, ticker))
+            nome_curto = _gerar_nome_curto(ticker, nome_completo)
+
+            resultados.append({
+                'Ticker': ticker,
+                'Empresa': nome_curto,
+                'Preco': preco,
+                'Volume': volume,
+                'Queda_Dia': queda_dia,
+                'Gap': gap,
+                'IS': is_index,
+                'RSI14': rsi,
+                'Stoch': stoch,
+                'Potencial': classificacao,
+                'Score': score,
+                'Sinais': ", ".join(sinais) if sinais else "-",
+                'Explicacoes': explicacoes,
+                'Liquidez': int(ranking_liq),
+                'EMA20': _f(row.get('EMA20')),
+                'EMA50': _f(row.get('EMA50')),
+                'EMA200': _f(row.get('EMA200')),
+            })
+        except Exception:
+            continue
+
+    return resultados or None
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def obter_historico_ticker(ticker):
+    """Histórico diário + indicadores de UM ticker (para gráfico/detalhe).
+
+    Substitui o antigo ``df_calc.xs(ticker)``: como o scanner não baixa mais o
+    histórico de todos os tickers, o detalhe do ticker selecionado é buscado sob
+    demanda (1 ticker = rápido e raramente sofre rate limit). Retorna um
+    DataFrame de colunas simples (Close, Open, High, Low, Volume + indicadores)
+    ou ``None``.
+    """
+    try:
+        df = _yf_baixar(f"{ticker}.SA", period=PERIODO, auto_adjust=True,
+                        progress=False, timeout=30)
+        if df is None or df.empty:
+            return None
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        df = df.dropna(subset=['Close'])
+        if df.empty:
+            return None
+
+        close, high, low = df['Close'], df['High'], df['Low']
+        delta = close.diff()
+        ganho = delta.clip(lower=0).rolling(14).mean()
+        perda = -delta.clip(upper=0).rolling(14).mean()
+        rs = ganho / perda
+        df['RSI14'] = 100 - (100 / (1 + rs))
+        lowest_low = low.rolling(window=14).min()
+        highest_high = high.rolling(window=14).max()
+        df['Stoch_K'] = 100 * ((close - lowest_low) / (highest_high - lowest_low))
+        df['EMA20'] = close.ewm(span=20).mean()
+        df['EMA50'] = close.ewm(span=50).mean()
+        df['EMA200'] = close.ewm(span=200).mean()
+        sma = close.rolling(20).mean()
+        std = close.rolling(20).std()
+        df['BB_Lower'] = sma - (std * 2)
+        df['BB_Upper'] = sma + (std * 2)
+        ema_12 = close.ewm(span=12).mean()
+        ema_26 = close.ewm(span=26).mean()
+        macd = ema_12 - ema_26
+        df['MACD_Hist'] = macd - macd.ewm(span=9).mean()
+        return df
+    except Exception:
+        return None
 
 
 def plotar_grafico(df_ticker, ticker, empresa, rsi, is_val,
