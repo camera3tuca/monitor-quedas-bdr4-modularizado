@@ -579,13 +579,23 @@ if 'oportunidades' in st.session_state:
                         if df_horario is None:
                             st.caption('⚠️ Dados horários indisponíveis — usando fallback diário.')
 
-                    fig = plotar_grafico(df_ticker, ticker, row['Empresa'], row['RSI14'], row['IS'],
-                                         timeframe=timeframe_sel,
-                                         zoom_periods=zoom_final,
-                                         tipo_grafico=tipo_graf,
-                                         df_horario=df_horario,
-                                         preco_atual=row['Preco'],
-                                         emas_atual=emas_screener)
+                    try:
+                        fig = plotar_grafico(df_ticker, ticker, row['Empresa'], row['RSI14'], row['IS'],
+                                             timeframe=timeframe_sel,
+                                             zoom_periods=zoom_final,
+                                             tipo_grafico=tipo_graf,
+                                             df_horario=df_horario,
+                                             preco_atual=row['Preco'],
+                                             emas_atual=emas_screener)
+                    except TypeError:
+                        # Resiliência ao recarregamento parcial de módulos no Streamlit
+                        # Cloud: se a versão em cache de plotar_grafico ainda não tiver os
+                        # kwargs novos, desenha sem eles (status cai para base yfinance).
+                        fig = plotar_grafico(df_ticker, ticker, row['Empresa'], row['RSI14'], row['IS'],
+                                             timeframe=timeframe_sel,
+                                             zoom_periods=zoom_final,
+                                             tipo_grafico=tipo_graf,
+                                             df_horario=df_horario)
                     st.pyplot(fig)
 
                 with col2:
