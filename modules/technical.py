@@ -485,21 +485,32 @@ _TV_CAMPOS = [
 ]
 
 
-def _liquidez_por_volume(vol_medio):
-    """Ranking de liquidez 0-10 a partir do volume médio (10 dias)."""
+def _liquidez(vol_medio, preco, volume_hoje=0):
+    """Ranking de liquidez 0-10 pelo volume FINANCEIRO médio (R$/dia).
+
+    BDRs negociam poucas ações por dia, então faixas em número de ações quase
+    sempre caem no fundo da escala. O volume financeiro (ações × preço) é uma
+    medida de liquidez muito mais informativa para BDRs. Usa o volume médio de
+    10 dias quando disponível; senão, cai para o volume do dia.
+    """
     try:
-        vol_medio = float(vol_medio or 0)
+        vol = float(vol_medio or 0)
+        if vol <= 0:
+            vol = float(volume_hoje or 0)
+        preco = float(preco or 0)
     except (TypeError, ValueError):
         return 1
-    if vol_medio > 1_000_000: return 10
-    if vol_medio >   500_000: return 9
-    if vol_medio >   200_000: return 8
-    if vol_medio >   100_000: return 7
-    if vol_medio >    50_000: return 6
-    if vol_medio >    20_000: return 5
-    if vol_medio >    10_000: return 4
-    if vol_medio >     5_000: return 3
-    if vol_medio >     1_000: return 2
+
+    financeiro = vol * preco  # R$ negociados por dia (aproximado)
+    if financeiro >= 5_000_000: return 10
+    if financeiro >= 2_000_000: return 9
+    if financeiro >= 1_000_000: return 8
+    if financeiro >=   500_000: return 7
+    if financeiro >=   200_000: return 6
+    if financeiro >=   100_000: return 5
+    if financeiro >=    50_000: return 4
+    if financeiro >=    20_000: return 3
+    if financeiro >=     5_000: return 2
     return 1
 
 
@@ -578,7 +589,7 @@ def buscar_oportunidades_tv(lista_bdrs, mapa_nomes):
             sinais, score, classificacao, explicacoes = gerar_sinal(linha, None)
 
             is_index = ((100 - rsi) + (100 - stoch)) / 2
-            ranking_liq = _liquidez_por_volume(vol_medio)
+            ranking_liq = _liquidez(vol_medio, preco, volume)
 
             nome_completo = (str(row.get('description') or '').strip()
                              or mapa_nomes.get(ticker, ticker))
