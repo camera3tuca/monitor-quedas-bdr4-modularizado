@@ -232,34 +232,34 @@ with st.expander("📚 Guia dos Indicadores - Entenda os Sinais", expanded=False
 st.markdown("---")
 
 if st.button("🔄 Atualizar Análise", type="primary"):
-    buscar_dados.clear()
-    with st.spinner("Conectando à API e baixando dados..."):
-        # Usar dicionário local de BDRs em vez de buscar da BRAPI
-        lista_bdrs = list(NOMES_BDRS.keys())
+    buscar_oportunidades_tv.clear()
+    lista_bdrs = list(NOMES_BDRS.keys())
+    oportunidades = None
 
-        df = buscar_dados(lista_bdrs)
+    # Caminho rápido: scanner em massa via TradingView (1 requisição, sem o
+    # bloqueio de IP do Yahoo). O histórico do ticker selecionado é buscado
+    # sob demanda no gráfico (obter_historico_ticker).
+    with st.spinner("Buscando dados ao vivo (TradingView)..."):
+        oportunidades = buscar_oportunidades_tv(lista_bdrs, NOMES_BDRS)
 
-        if df.empty:
-            st.error("Erro ao carregar dados. Se o Yahoo tiver bloqueado, aguarde alguns minutos.")
-            st.stop()
+    # Fallback: se o TradingView falhar, usa o caminho antigo via yfinance.
+    if not oportunidades:
+        buscar_dados.clear()
+        with st.spinner("TradingView indisponível — baixando via Yahoo Finance..."):
+            df = buscar_dados(lista_bdrs)
+            if df.empty:
+                st.error("Erro ao carregar dados. Se o Yahoo tiver bloqueado, aguarde alguns minutos.")
+                st.stop()
+        with st.spinner("Calculando indicadores técnicos..."):
+            df_calc = calcular_indicadores(df)
+        with st.spinner("Analisando oportunidades..."):
+            oportunidades = analisar_oportunidades(df_calc, NOMES_BDRS)
 
-    # Calcular indicadores
-    with st.spinner("Calculando indicadores técnicos..."):
-        df_calc = calcular_indicadores(df)
+    if oportunidades:
+        st.session_state['oportunidades'] = oportunidades
 
-    # Analisar oportunidades usando dicionário local
-    with st.spinner("Analisando oportunidades..."):
-        oportunidades = analisar_oportunidades(df_calc, NOMES_BDRS)
-
-        if oportunidades:
-            # Atualizar os nomes nas oportunidades (já processados em analisar_oportunidades)
-            # Salvar no session_state
-            st.session_state['oportunidades'] = oportunidades
-            st.session_state['df_calc'] = df_calc
-
-if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
+if 'oportunidades' in st.session_state:
     oportunidades = st.session_state['oportunidades']
-    df_calc = st.session_state['df_calc']
 
     # Criar DataFrame das oportunidades
     df_res = pd.DataFrame(oportunidades)
@@ -325,56 +325,42 @@ if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
         for opp in oportunidades:
             ticker = opp['Ticker']
             try:
-                # Filtro de ETF — aplicado primeiro, sem precisar de df_calc
+                # Filtro de ETF — aplicado primeiro, sem precisar de histórico
                 if filtrar_etf:
                     if not eh_etf(ticker):
                         continue
                     contadores['etf'] += 1
 
-                df_ticker = df_calc.xs(ticker, axis=1, level=1).dropna()
-
-                # Verificar tamanho mínimo
-                tam = len(df_ticker)
-                if tam < 20:
+                ultimo_close = opp.get('Preco')
+                if ultimo_close is None or pd.isna(ultimo_close):
                     contadores['sem_dados'] += 1
                     continue
 
-                ultimo_close = df_ticker['Close'].iloc[-1]
-
-                # Verificar cada condição separadamente
+                # Verificar cada condição separadamente, usando as EMAs já
+                # entregues pelo scanner (TradingView ou fallback yfinance).
                 passa_filtro = True
 
                 # Filtro EMA20
                 if filtrar_ema20:
-                    if 'EMA20' in df_ticker.columns and tam >= 20:
-                        ultima_ema20 = df_ticker['EMA20'].iloc[-1]
-                        if pd.notna(ultima_ema20) and ultimo_close > ultima_ema20:
-                            contadores['ema20'] += 1
-                        else:
-                            passa_filtro = False
+                    ema20 = opp.get('EMA20')
+                    if pd.notna(ema20) and ultimo_close > ema20:
+                        contadores['ema20'] += 1
                     else:
                         passa_filtro = False
 
                 # Filtro EMA50
                 if filtrar_ema50 and passa_filtro:
-                    if 'EMA50' in df_ticker.columns and tam >= 50:
-                        ultima_ema50 = df_ticker['EMA50'].iloc[-1]
-                        if pd.notna(ultima_ema50) and ultimo_close > ultima_ema50:
-                            contadores['ema50'] += 1
-                        else:
-                            passa_filtro = False
+                    ema50 = opp.get('EMA50')
+                    if pd.notna(ema50) and ultimo_close > ema50:
+                        contadores['ema50'] += 1
                     else:
                         passa_filtro = False
 
                 # Filtro EMA200
                 if filtrar_ema200 and passa_filtro:
-                    # EMA200 precisa de pelo menos 50 períodos para ser significativa
-                    if 'EMA200' in df_ticker.columns and tam >= 50:
-                        ultima_ema200 = df_ticker['EMA200'].iloc[-1]
-                        if pd.notna(ultima_ema200) and ultimo_close > ultima_ema200:
-                            contadores['ema200'] += 1
-                        else:
-                            passa_filtro = False
+                    ema200 = opp.get('EMA200')
+                    if pd.notna(ema200) and ultimo_close > ema200:
+                        contadores['ema200'] += 1
                     else:
                         passa_filtro = False
 
@@ -492,7 +478,10 @@ if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
             st.markdown(f'<h3 class="section-header">📈 Análise Técnica: {ticker} - {row["Empresa"]}</h3>', unsafe_allow_html=True)
 
             try:
-                df_ticker = df_calc.xs(ticker, axis=1, level=1).dropna()
+                df_ticker = obter_historico_ticker(ticker)
+                df_ticker = df_ticker.dropna() if df_ticker is not None else pd.DataFrame()
+                if df_ticker.empty:
+                    raise ValueError(f"Sem histórico disponível para {ticker} (Yahoo pode ter bloqueado). Tente novamente em instantes.")
 
                 # ── Controles do gráfico ─────────────────────────────────────────
                 st.markdown("**⚙️ Configurações do Gráfico:**")
@@ -535,7 +524,7 @@ if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
                     if st.button("🔎+  Zoom In", key=f"zin_{ticker}"):
                         current_zoom = st.session_state.get(f'zoom_custom_{ticker}', None)
                         if current_zoom is None:
-                            st.session_state[f'zoom_custom_{ticker}'] = max(10, len(df_calc.xs(ticker, axis=1, level=1).dropna()) // 2)
+                            st.session_state[f'zoom_custom_{ticker}'] = max(10, len(df_ticker) // 2)
                         else:
                             st.session_state[f'zoom_custom_{ticker}'] = max(10, int(current_zoom * 0.6))
 
@@ -546,7 +535,7 @@ if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
                             pass
                         else:
                             new_zoom = int(current_zoom * 1.6)
-                            total = len(df_calc.xs(ticker, axis=1, level=1).dropna())
+                            total = len(df_ticker)
                             if new_zoom >= total:
                                 st.session_state[f'zoom_custom_{ticker}'] = None
                             else:
@@ -649,8 +638,11 @@ if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
             # === ESTRATÉGIA TRIPLE SCREEN ===
             st.markdown("---")
             try:
-                df_ticker_ts = df_calc.xs(ticker, axis=1, level=1).dropna()
-                resultado_ts = analisar_triple_screen(df_ticker_ts)
+                df_ticker_ts = obter_historico_ticker(ticker)
+                if df_ticker_ts is None or df_ticker_ts.dropna().empty:
+                    resultado_ts = None
+                else:
+                    resultado_ts = analisar_triple_screen(df_ticker_ts.dropna())
             except Exception:
                 resultado_ts = None
             renderizar_triple_screen(resultado_ts, ticker, row['Empresa'])
@@ -912,8 +904,9 @@ if 'oportunidades' in st.session_state and 'df_calc' in st.session_state:
 
             # === FLOW.AI — FLUXO DE BIG PLAYERS ===
             try:
-                df_flow_input = df_calc.xs(ticker, axis=1, level=1).dropna()
-                renderizar_painel_flow(df_flow_input, ticker, row['Empresa'])
+                df_flow_input = obter_historico_ticker(ticker)
+                if df_flow_input is not None and not df_flow_input.dropna().empty:
+                    renderizar_painel_flow(df_flow_input.dropna(), ticker, row['Empresa'])
             except Exception:
                 pass
 
