@@ -631,7 +631,8 @@ if 'oportunidades' in st.session_state:
                         st.metric("⚡ Gap de Abertura", f"{row['Gap']:.2f}%", delta_color="inverse")
 
                     st.markdown(f"**⭐ Score:** {row['Score']}/10")
-                    st.markdown(f"**📊 Volume (R$/dia):** R$ {row['Volume']:,.0f}")
+                    # Escapa os '$' para o Streamlit não interpretar como fórmula (LaTeX).
+                    st.markdown(f"**📊 Volume (R\\$/dia):** R\\$ {row['Volume']:,.0f}")
 
                     # Sinais técnicos
                     st.markdown("""
