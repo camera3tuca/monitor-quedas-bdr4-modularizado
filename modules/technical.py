@@ -992,17 +992,33 @@ def plotar_grafico(df_ticker, ticker, empresa, rsi, is_val,
             ax3.xaxis.set_major_formatter(mdates.DateFormatter('%b/%y'))
 
     elif timeframe == 'Semanal':
-        # Semanas: "W19/Mai", início de cada semana
-        ax3.xaxis.set_major_formatter(mdates.DateFormatter('%d/%b/%y'))
+        # Rótulos adaptativos: com muitos anos de dados, espaça por mês/trimestre
+        # /semestre para não amontoar (evita o "borrão" no eixo).
         if n_barras <= 26:
             ax3.xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=0, interval=1))
+            ax3.xaxis.set_major_formatter(mdates.DateFormatter('%d/%b/%y'))
+        elif n_barras <= 60:
+            ax3.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+            ax3.xaxis.set_major_formatter(mdates.DateFormatter('%b/%y'))
+        elif n_barras <= 160:
+            ax3.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+            ax3.xaxis.set_major_formatter(mdates.DateFormatter('%b/%y'))
         else:
-            ax3.xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=0, interval=2))
+            ax3.xaxis.set_major_locator(mdates.MonthLocator(interval=6))
+            ax3.xaxis.set_major_formatter(mdates.DateFormatter('%b/%y'))
 
     elif timeframe == 'Mensal':
-        # Meses: "Jan/25", "Fev/25", etc. — um rótulo por mês
-        ax3.xaxis.set_major_formatter(mdates.DateFormatter('%b/%y'))
-        ax3.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+        # Rótulos adaptativos: até 2 anos, um por mês; depois por trimestre ou
+        # por ano, conforme a quantidade de barras.
+        if n_barras <= 24:
+            ax3.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+            ax3.xaxis.set_major_formatter(mdates.DateFormatter('%b/%y'))
+        elif n_barras <= 72:
+            ax3.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+            ax3.xaxis.set_major_formatter(mdates.DateFormatter('%b/%y'))
+        else:
+            ax3.xaxis.set_major_locator(mdates.YearLocator())
+            ax3.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
 
     plt.setp(ax3.xaxis.get_majorticklabels(),
              rotation=40, ha='right', fontsize=9, fontweight='600', color='#334155')
