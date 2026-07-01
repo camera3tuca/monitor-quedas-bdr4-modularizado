@@ -579,8 +579,22 @@ if 'oportunidades' in st.session_state:
                         if df_horario is None:
                             st.caption('⚠️ Dados horários indisponíveis — usando fallback diário.')
 
+                    # Para semanal/mensal, puxa mais histórico para que os
+                    # indicadores recalculados nesses timeframes tenham barras
+                    # suficientes (ex.: EMA200 semanal precisa de ~5 anos). O
+                    # diário/horário mantém o histórico padrão (1 ano).
+                    df_ticker_plot = df_ticker
+                    _periodo_tf = {'Semanal': '5y', 'Mensal': 'max'}.get(timeframe_sel)
+                    if _periodo_tf:
+                        try:
+                            _df_longo = obter_historico_ticker(ticker, periodo=_periodo_tf)
+                            if _df_longo is not None and not _df_longo.dropna(subset=['Close']).empty:
+                                df_ticker_plot = _df_longo
+                        except Exception:
+                            pass
+
                     try:
-                        fig = plotar_grafico(df_ticker, ticker, row['Empresa'], row['RSI14'], row['IS'],
+                        fig = plotar_grafico(df_ticker_plot, ticker, row['Empresa'], row['RSI14'], row['IS'],
                                              timeframe=timeframe_sel,
                                              zoom_periods=zoom_final,
                                              tipo_grafico=tipo_graf,
@@ -591,7 +605,7 @@ if 'oportunidades' in st.session_state:
                         # Resiliência ao recarregamento parcial de módulos no Streamlit
                         # Cloud: se a versão em cache de plotar_grafico ainda não tiver os
                         # kwargs novos, desenha sem eles (status cai para base yfinance).
-                        fig = plotar_grafico(df_ticker, ticker, row['Empresa'], row['RSI14'], row['IS'],
+                        fig = plotar_grafico(df_ticker_plot, ticker, row['Empresa'], row['RSI14'], row['IS'],
                                              timeframe=timeframe_sel,
                                              zoom_periods=zoom_final,
                                              tipo_grafico=tipo_graf,

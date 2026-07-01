@@ -630,18 +630,48 @@ def buscar_oportunidades_tv(lista_bdrs, mapa_nomes):
     return resultados or None
 
 
+def _indicadores_basicos(df):
+    """Calcula RSI14, Stoch_K, EMA20/50/200, Bollinger e MACD_Hist sobre as
+    barras do próprio ``df`` (colunas Close/High/Low). Recalcular no timeframe
+    correto — em vez de reamostrar valores diários — deixa os indicadores
+    coerentes com o gráfico (ex.: EMA20 semanal = EMA de 20 semanas)."""
+    close, high, low = df['Close'], df['High'], df['Low']
+    delta = close.diff()
+    ganho = delta.clip(lower=0).rolling(14).mean()
+    perda = -delta.clip(upper=0).rolling(14).mean()
+    rs = ganho / perda
+    df['RSI14'] = 100 - (100 / (1 + rs))
+    lowest_low = low.rolling(window=14).min()
+    highest_high = high.rolling(window=14).max()
+    df['Stoch_K'] = 100 * ((close - lowest_low) / (highest_high - lowest_low))
+    df['EMA20'] = close.ewm(span=20).mean()
+    df['EMA50'] = close.ewm(span=50).mean()
+    df['EMA200'] = close.ewm(span=200).mean()
+    sma = close.rolling(20).mean()
+    std = close.rolling(20).std()
+    df['BB_Lower'] = sma - (std * 2)
+    df['BB_Upper'] = sma + (std * 2)
+    ema_12 = close.ewm(span=12).mean()
+    ema_26 = close.ewm(span=26).mean()
+    macd = ema_12 - ema_26
+    df['MACD_Hist'] = macd - macd.ewm(span=9).mean()
+    return df
+
+
 @st.cache_data(ttl=900, show_spinner=False)
-def obter_historico_ticker(ticker):
+def obter_historico_ticker(ticker, periodo=PERIODO):
     """Histórico diário + indicadores de UM ticker (para gráfico/detalhe).
 
     Substitui o antigo ``df_calc.xs(ticker)``: como o scanner não baixa mais o
     histórico de todos os tickers, o detalhe do ticker selecionado é buscado sob
-    demanda (1 ticker = rápido e raramente sofre rate limit). Retorna um
-    DataFrame de colunas simples (Close, Open, High, Low, Volume + indicadores)
+    demanda (1 ticker = rápido e raramente sofre rate limit). ``periodo`` permite
+    puxar mais histórico para os timeframes semanal/mensal (ex.: '5y', 'max'),
+    para que os indicadores nesses timeframes tenham barras suficientes. Retorna
+    um DataFrame de colunas simples (Close, Open, High, Low, Volume + indicadores)
     ou ``None``.
     """
     try:
-        df = _yf_baixar(f"{ticker}.SA", period=PERIODO, auto_adjust=True,
+        df = _yf_baixar(f"{ticker}.SA", period=periodo, auto_adjust=True,
                         progress=False, timeout=30)
         if df is None or df.empty:
             return None
@@ -650,28 +680,7 @@ def obter_historico_ticker(ticker):
         df = df.dropna(subset=['Close'])
         if df.empty:
             return None
-
-        close, high, low = df['Close'], df['High'], df['Low']
-        delta = close.diff()
-        ganho = delta.clip(lower=0).rolling(14).mean()
-        perda = -delta.clip(upper=0).rolling(14).mean()
-        rs = ganho / perda
-        df['RSI14'] = 100 - (100 / (1 + rs))
-        lowest_low = low.rolling(window=14).min()
-        highest_high = high.rolling(window=14).max()
-        df['Stoch_K'] = 100 * ((close - lowest_low) / (highest_high - lowest_low))
-        df['EMA20'] = close.ewm(span=20).mean()
-        df['EMA50'] = close.ewm(span=50).mean()
-        df['EMA200'] = close.ewm(span=200).mean()
-        sma = close.rolling(20).mean()
-        std = close.rolling(20).std()
-        df['BB_Lower'] = sma - (std * 2)
-        df['BB_Upper'] = sma + (std * 2)
-        ema_12 = close.ewm(span=12).mean()
-        ema_26 = close.ewm(span=26).mean()
-        macd = ema_12 - ema_26
-        df['MACD_Hist'] = macd - macd.ewm(span=9).mean()
-        return df
+        return _indicadores_basicos(df)
     except Exception:
         return None
 
@@ -720,16 +729,17 @@ def plotar_grafico(df_ticker, ticker, empresa, rsi, is_val,
         df_full = df_ticker[colunas_pres].dropna(subset=['Close', 'EMA20']).copy()
         df_full = df_full.sort_index()
 
-        if timeframe == 'Semanal':
+        # OHLCV agregado corretamente; os indicadores são RECALCULADOS nas barras
+        # do novo timeframe (não reamostrados do diário) para ficarem coerentes.
+        ohlcv = ['Open', 'High', 'Low', 'Close', 'Volume']
+        if timeframe in ('Semanal', 'Mensal'):
+            regra = 'W' if timeframe == 'Semanal' else 'ME'
             agg = {c: ('first' if c == 'Open' else 'max' if c == 'High' else
-                       'min' if c == 'Low' else 'last' if c == 'Close' else
-                       'sum' if c == 'Volume' else 'last') for c in colunas_pres}
-            df = df_full.resample('W').agg(agg).dropna(subset=['Close'])
-        elif timeframe == 'Mensal':
-            agg = {c: ('first' if c == 'Open' else 'max' if c == 'High' else
-                       'min' if c == 'Low' else 'last' if c == 'Close' else
-                       'sum' if c == 'Volume' else 'last') for c in colunas_pres}
-            df = df_full.resample('ME').agg(agg).dropna(subset=['Close'])
+                       'min' if c == 'Low' else 'last' if c == 'Close' else 'sum')
+                   for c in colunas_pres if c in ohlcv}
+            df = df_full.resample(regra).agg(agg).dropna(subset=['Close'])
+            if not df.empty:
+                df = _indicadores_basicos(df)
         else:   # Diário
             df = df_full.copy()
 
