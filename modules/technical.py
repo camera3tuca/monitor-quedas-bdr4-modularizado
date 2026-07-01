@@ -743,8 +743,8 @@ def plotar_grafico(df_ticker, ticker, empresa, rsi, is_val,
     ema200 = df['EMA200'] if 'EMA200' in df.columns else None
     datas  = df.index
 
-    fig, axes = plt.subplots(3, 1, figsize=(12, 9), sharex=True,
-                             gridspec_kw={'height_ratios': [3, 1, 1]})
+    fig, axes = plt.subplots(4, 1, figsize=(12, 11), sharex=True,
+                             gridspec_kw={'height_ratios': [3, 1, 1, 1.1]})
 
     # ── Fibonacci ────────────────────────────────────────────────────────────────
     high = df['High'].max() if 'High' in df.columns else close.max()
@@ -928,8 +928,32 @@ def plotar_grafico(df_ticker, ticker, empresa, rsi, is_val,
     ax3.set_ylim(0, 100)
     ax3.grid(True, alpha=0.18)
 
-    # ── Eixo X — formatação exata por timeframe ──────────────────────────────────
-    ax3 = axes[2]
+    # ── Painel 4: Volume ──────────────────────────────────────────────────────────
+    ax4 = axes[3]
+    if 'Volume' in df.columns:
+        vol = df['Volume'].reindex(datas).fillna(0)
+        base_open = df['Open'] if 'Open' in df.columns else close
+        cores_vol = ['#26a69a' if float(c) >= float(o) else '#ef5350'
+                     for c, o in zip(close, base_open)]
+        larg = {'Semanal': 5, 'Mensal': 22, 'Horário (60min)': 0.035}.get(timeframe, 0.8)
+        ax4.bar(datas, vol, width=larg, color=cores_vol, alpha=0.55, zorder=2)
+        vol_ma = vol.rolling(20, min_periods=1).mean()
+        ax4.plot(datas, vol_ma, color='#455a64', linewidth=1.1, alpha=0.9,
+                 label='Média 20', zorder=3)
+        ax4.legend(loc='upper left', fontsize=6.5, framealpha=0.9)
+
+        from matplotlib.ticker import FuncFormatter
+        def _fmt_vol(x, _):
+            if x >= 1e9: return f'{x/1e9:.1f}B'
+            if x >= 1e6: return f'{x/1e6:.1f}M'
+            if x >= 1e3: return f'{x/1e3:.0f}K'
+            return f'{x:.0f}'
+        ax4.yaxis.set_major_formatter(FuncFormatter(_fmt_vol))
+    ax4.set_ylabel('Volume', fontsize=9)
+    ax4.grid(True, alpha=0.18)
+
+    # ── Eixo X — formatação exata por timeframe (painel inferior = Volume) ────────
+    ax3 = axes[3]
     n_barras = len(df)
 
     if timeframe == 'Horário (60min)':
