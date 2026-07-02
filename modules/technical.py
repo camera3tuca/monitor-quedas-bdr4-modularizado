@@ -295,8 +295,8 @@ def gerar_sinal(row_ticker, df_ticker):
                 score += 2
 
         if pd.notna(macd_hist) and macd_hist > 0:
-            sinais.append("MACD Virando")
-            explicacoes.append("🔄 MACD positivo: Momentum de alta começando")
+            sinais.append("MACD Comprador")
+            explicacoes.append("🔄 MACD acima da linha de sinal: momentum comprador ativo")
             score += 1
 
         if pd.notna(close) and pd.notna(bb_lower):
@@ -308,6 +308,26 @@ def gerar_sinal(row_ticker, df_ticker):
                 sinais.append("Suporte BB")
                 explicacoes.append("🎯 Preço próximo da Banda Inferior: Zona de suporte")
                 score += 1
+
+        # Contexto de TENDÊNCIA pelas EMAs — o foco do app é "correção dentro de
+        # tendência de alta". Separa a queda saudável (dip para comprar) da queda
+        # em tendência de baixa ("faca caindo").
+        ema20  = row_ticker.get('EMA20')
+        ema50  = row_ticker.get('EMA50')
+        ema200 = row_ticker.get('EMA200')
+        if pd.notna(close) and pd.notna(ema50) and pd.notna(ema200):
+            if close > ema200 and ema50 >= ema200:
+                sinais.append("Correção em Alta")
+                explicacoes.append("📈 Queda dentro de tendência de alta (preço > EMA200 e EMA50 ≥ EMA200): correção, não reversão de baixa")
+                score += 2
+                if pd.notna(ema20) and ema20 <= close <= ema20 * 1.03:
+                    sinais.append("Suporte EMA20")
+                    explicacoes.append("🎯 Preço recuando até a EMA20 (suporte de curto prazo) em tendência de alta")
+                    score += 1
+            elif close < ema200:
+                sinais.append("Abaixo EMA200")
+                explicacoes.append("⚠️ Preço abaixo da EMA200: tendência de baixa — atenção ao risco de 'faca caindo'")
+                # sem pontuação: é um alerta de risco, não um sinal de entrada
 
         fibo = calcular_fibonacci(df_ticker)
         if fibo and (fibo['61.8%'] * 0.99 <= close <= fibo['61.8%'] * 1.01):
@@ -610,6 +630,9 @@ def buscar_oportunidades_tv(lista_bdrs, mapa_nomes):
                 'Stoch_K': stoch,
                 'MACD_Hist': macd_hist,
                 'BB_Lower': bb_lower,
+                'EMA20': _f(row.get('EMA20')),
+                'EMA50': _f(row.get('EMA50')),
+                'EMA200': _f(row.get('EMA200')),
             })
             sinais, score, classificacao, explicacoes = gerar_sinal(linha, None)
 
