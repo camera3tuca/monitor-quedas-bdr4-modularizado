@@ -325,6 +325,18 @@ def _eh_etf_ticker(ticker):
     return str(ticker).strip().upper().endswith('39')
 
 
+def _titulo_nome(texto):
+    """Title Case preservando acrônimos curtos em maiúsculas (KLA, MKS, AMD, IBM)."""
+    palavras = []
+    for w in texto.replace(',', '').split():
+        nucleo = w.replace('.', '')
+        if nucleo.isupper() and 2 <= len(nucleo) <= 4:
+            palavras.append(w)          # acrônimo → mantém como está
+        else:
+            palavras.append(w.title())
+    return " ".join(palavras)
+
+
 def _gerar_nome_curto(ticker, nome_completo):
     """
     Gera um nome curto e diferenciado para exibição na tabela.
@@ -340,14 +352,17 @@ def _gerar_nome_curto(ticker, nome_completo):
     if nome_completo == ticker:
         return ticker
 
-    ignore_list = ['INC', 'CORP', 'LTD', 'S.A.', 'GMBH', 'PLC', 'GROUP',
-                    'HOLDINGS', 'CO', 'LLC']
+    ignore_list = ['INC', 'CORP', 'CORPORATION', 'INCORPORATED', 'LTD', 'S.A.',
+                    'GMBH', 'PLC', 'GROUP', 'HOLDINGS', 'HOLDING', 'CO', 'LLC',
+                    'SHS', 'SHARES', 'UNSPONSORED', 'SPONSORED', 'ADR', 'ADS',
+                    'COMMON', 'STOCK', 'CLASS', 'REGISTERED', 'REIT', 'NV', 'AG',
+                    'SE', 'THE', 'COMPANY']
     palavras = nome_completo.split()
     palavras_uteis = [p for p in palavras
                       if p.upper().replace('.', '').replace(',', '') not in ignore_list]
 
     if not palavras_uteis:
-        return nome_completo.replace(',', '').title()
+        return _titulo_nome(nome_completo)
 
     if _eh_etf_ticker(ticker):
         # Para ETFs, mantém mais palavras para preservar o diferencial
@@ -362,7 +377,7 @@ def _gerar_nome_curto(ticker, nome_completo):
     else:
         nome_curto = " ".join(palavras_uteis[:2])
 
-    return nome_curto.replace(',', '').title()
+    return _titulo_nome(nome_curto)
 
 
 def analisar_oportunidades(df_calc, mapa_nomes):
@@ -601,8 +616,12 @@ def buscar_oportunidades_tv(lista_bdrs, mapa_nomes):
             is_index = ((100 - rsi) + (100 - stoch)) / 2
             ranking_liq = _liquidez(vol_medio, preco, volume)
 
-            nome_completo = (str(row.get('description') or '').strip()
-                             or mapa_nomes.get(ticker, ticker))
+            # Prefere o nome curado (NOMES_BDRS) à descrição crua do TradingView
+            # (que traz ruído tipo "Shs"/"Unsponsored"); cai para a descrição só
+            # quando o ticker não está no dicionário curado.
+            nome_completo = (mapa_nomes.get(ticker)
+                             or str(row.get('description') or '').strip()
+                             or ticker)
             nome_curto = _gerar_nome_curto(ticker, nome_completo)
 
             resultados.append({
