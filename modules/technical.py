@@ -270,6 +270,7 @@ def gerar_sinal(row_ticker, df_ticker):
         if s >= 1: return "Média"
         return "Baixa"
 
+    em_baixa = False  # preço abaixo da EMA200 (tendência de baixa)
     try:
         close = row_ticker.get('Close')
         rsi = row_ticker.get('RSI14')
@@ -325,9 +326,9 @@ def gerar_sinal(row_ticker, df_ticker):
                     explicacoes.append("🎯 Preço recuando até a EMA20 (suporte de curto prazo) em tendência de alta")
                     score += 1
             elif close < ema200:
+                em_baixa = True
                 sinais.append("Abaixo EMA200")
                 explicacoes.append("⚠️ Preço abaixo da EMA200: tendência de baixa — atenção ao risco de 'faca caindo'")
-                # sem pontuação: é um alerta de risco, não um sinal de entrada
 
         fibo = calcular_fibonacci(df_ticker)
         if fibo and (fibo['61.8%'] * 0.99 <= close <= fibo['61.8%'] * 1.01):
@@ -335,7 +336,18 @@ def gerar_sinal(row_ticker, df_ticker):
             explicacoes.append("⭐ Preço na Zona de Ouro do Fibonacci (61.8%): Ponto ideal de reversão!")
             score += 2
 
-        return sinais, score, classificar(score), explicacoes
+        # Penaliza o potencial em tendência de baixa: comprar contra a tendência
+        # principal ("faca caindo") é um trade de maior risco, então o score cai
+        # e o Potencial nunca chega a "Muito Alta".
+        if em_baixa:
+            score = max(0, score - 3)
+            classificacao = classificar(score)
+            if classificacao == "Muito Alta":
+                classificacao = "Alta"
+        else:
+            classificacao = classificar(score)
+
+        return sinais, score, classificacao, explicacoes
     except:
         return [], 0, "Indefinida", []
 
