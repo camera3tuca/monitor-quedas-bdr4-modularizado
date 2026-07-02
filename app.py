@@ -263,6 +263,8 @@ if st.button("🔄 Atualizar Análise", type="primary"):
 
     if oportunidades:
         st.session_state['oportunidades'] = oportunidades
+        # Registra quando a análise foi feita (horário de Brasília)
+        st.session_state['analise_timestamp'] = datetime.now(pytz.timezone('America/Sao_Paulo'))
 
 if 'oportunidades' in st.session_state:
     oportunidades = st.session_state['oportunidades']
@@ -272,6 +274,9 @@ if 'oportunidades' in st.session_state:
     df_res = df_res.sort_values(by='Queda_Dia', ascending=True)
 
     st.success(f"✅ {len(oportunidades)} oportunidades detectadas!")
+    _ts_analise = st.session_state.get('analise_timestamp')
+    if _ts_analise:
+        st.caption(f"🕒 Análise realizada em {_ts_analise.strftime('%d/%m/%Y às %H:%M')} (horário de Brasília)")
 
     # --- FILTROS COM DESIGN PROFISSIONAL ---
     st.markdown('<h3 class="section-header">🎯 Filtros de Tendência</h3>', unsafe_allow_html=True)
