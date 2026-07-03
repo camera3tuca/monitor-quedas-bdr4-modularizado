@@ -143,6 +143,16 @@ def renderizar_painel_flow(df_ticker: pd.DataFrame, ticker: str, empresa: str):
         unsafe_allow_html=True,
     )
 
+    with st.expander("ℹ️ O que é o Flow.AI"):
+        st.markdown("""
+Estima a **pressão compradora vs. vendedora** analisando a posição do fechamento dentro de cada candle, ponderada pelo volume — uma aproximação do fluxo de grandes players.
+
+- **Agressão compradora** = `(Fechamento − Mínima) / (Máxima − Mínima)`; **vendedora** = `(Máxima − Fechamento) / (Máxima − Mínima)`.
+- O **fluxo líquido** (compra − venda) × volume relativo é acumulado numa janela, gerando o **sinal**: 🟢 compra · 🟡 aguardar · 🔴 venda.
+
+> É um indicador **derivado do preço/volume** (não é o book real de ofertas). Use como confirmação de força do movimento, junto com as demais seções.
+        """)
+
     df_flow = calcular_flow(df_ticker)
 
     if df_flow is None or df_flow.empty:
