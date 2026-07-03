@@ -867,6 +867,33 @@ def mapear_ticker_us(ticker_bdr):
     return stripped
 
 
+def _dividend_yield_frac(info):
+    """Dividend yield como FRAÇÃO (0.04 = 4%), robusto à unidade do yfinance.
+
+    Prefere dividendo anual ÷ preço (sem ambiguidade). Se não houver, usa o campo
+    ``dividendYield`` normalizando: versões novas do yfinance devolvem em percentual
+    (ex.: 4.15), antigas em fração (ex.: 0.0415) — valores > 1 são divididos por 100.
+    Retorna ``None`` quando não há dado. Corrige casos como yield exibido em ~14%
+    para papéis que na verdade pagam bem menos.
+    """
+    taxa = info.get('dividendRate') or info.get('trailingAnnualDividendRate')
+    preco = (info.get('currentPrice') or info.get('regularMarketPrice')
+             or info.get('previousClose'))
+    try:
+        if taxa and preco and float(preco) > 0:
+            return float(taxa) / float(preco)
+    except (TypeError, ValueError):
+        pass
+    dy = info.get('dividendYield') or info.get('trailingAnnualDividendYield')
+    try:
+        dy = float(dy)
+    except (TypeError, ValueError):
+        return None
+    if dy <= 0:
+        return None
+    return dy / 100 if dy > 1 else dy
+
+
 def calcular_score_fundamentalista(info):
     """
     Calcula score 0-100 baseado em métricas fundamentalistas
@@ -906,7 +933,7 @@ def calcular_score_fundamentalista(info):
                 detalhes['pe_ratio']['criterio'] = 'Regular (35-50)'
 
         # Dividend Yield (10 pontos)
-        div_yield = info.get('dividendYield')
+        div_yield = _dividend_yield_frac(info)
         if div_yield:
             detalhes['dividend_yield']['valor'] = div_yield
             if div_yield > 0.04:
@@ -2114,7 +2141,7 @@ def buscar_dados_fundamentalistas(ticker_bdr):
             det['pe_ratio'] = {'valor': None, 'pontos': 0, 'criterio': ''}
 
         # Dividend Yield
-        dy = info.get('dividendYield')
+        dy = _dividend_yield_frac(info)
         if dy and isinstance(dy, (int, float)):
             det['dividend_yield'] = {'valor': dy, 'pontos': 0, 'criterio': ''}
             if dy > 0.04:   score += 10; det['dividend_yield'].update(pontos=10, criterio='Excelente (>4%)')
