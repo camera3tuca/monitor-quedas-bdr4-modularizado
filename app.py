@@ -290,6 +290,17 @@ if 'oportunidades' in st.session_state:
     </div>
     """, unsafe_allow_html=True)
 
+    with st.expander("ℹ️ Como usar os filtros"):
+        st.markdown("""
+Os filtros ajudam a focar em **correções dentro de tendências de alta** (o objetivo do app), removendo quedas em tendência de baixa.
+
+- **Acima da EMA20 / EMA50 / EMA200:** mostra só BDRs cujo preço está **acima** da média escolhida. A EMA200 filtra a tendência de **longo prazo** (a mais importante); EMA20/50, curto/médio prazo. Pode combinar mais de uma.
+- **Apenas ETFs (terminação 39):** mostra só BDRs de ETFs que caíram.
+- **Liquidez mínima:** oculta BDRs abaixo do ranking de liquidez escolhido (0 = sem filtro; 10 = só as mais líquidas). Útil para evitar papéis com pouco volume e gaps.
+
+> Sem nenhum filtro marcado, a tabela mostra **todas** as BDRs em queda no dia.
+        """)
+
     col_filtro1, col_filtro2, col_filtro3, col_filtro4 = st.columns(4)
 
     with col_filtro1:
@@ -448,6 +459,23 @@ if 'oportunidades' in st.session_state:
         </div>
         """, unsafe_allow_html=True)
 
+        with st.expander("ℹ️ O que é esta seção e como ler cada coluna"):
+            st.markdown("""
+Lista as BDRs que **caíram no dia** e podem ser oportunidades de compra (correção). Dados ao vivo do TradingView, ordenados da maior para a menor queda.
+
+- **Empresa / Liq. (💧):** nome do BDR e **ranking de liquidez 0–10** (pelo volume financeiro médio/dia). Quanto maior, menor o risco de spread/gap e mais fácil entrar e sair.
+- **Preço:** cotação atual da BDR na B3 (R$).
+- **Queda_Dia:** variação % no dia (a tabela só mostra quedas).
+- **I.S. (Índice de Sobrevenda):** `((100−RSI)+(100−Estocástico))/2`. Quanto **maior**, mais sobrevendido (0–100).
+- **Vol. R$:** volume financeiro médio negociado por dia (R$).
+- **Gap:** diferença % entre a **abertura** de hoje e o **fechamento anterior**.
+- **Sinal (Potencial):** qualidade da oportunidade — Baixa / Média / Alta / Muito Alta. Em **tendência de baixa** (abaixo da EMA200) fica limitado a "Média".
+- **Força:** pontuação 0–10 somando os sinais detectados.
+- **Sinais Técnicos:** gatilhos encontrados (RSI Oversold, Stoch. Fundo, Correção em Alta, Testando EMA200, Abaixo EMA200, etc.).
+
+> ⚠️ É um **rastreador**, não recomendação de compra. Confirme sempre no gráfico e nas demais seções.
+            """)
+
         evento = st.dataframe(
             df_res.style.map(estilizar_potencial, subset=['Potencial'])
                         .map(estilizar_is, subset=['IS'])
@@ -487,6 +515,18 @@ if 'oportunidades' in st.session_state:
             ticker = row['Ticker']
 
             st.markdown(f'<h3 class="section-header">📈 Análise Técnica: {ticker} - {row["Empresa"]}</h3>', unsafe_allow_html=True)
+
+            with st.expander("ℹ️ Como ler o gráfico técnico"):
+                st.markdown("""
+O gráfico tem **4 painéis** (histórico via Yahoo; escolha o *timeframe* diário/semanal/mensal e o *zoom*):
+
+- **Painel de Preço:** a linha/candles do preço, as médias **EMA20 (azul), EMA50 (laranja) e EMA200 (verde)**, as **bandas de Bollinger** (sombra cinza) e os **níveis de Fibonacci** (linhas tracejadas coloridas + "Zona de Ouro" na 61,8%). O **título** resume: *I.S.*, a **tendência** (acima/abaixo das EMAs) e o Fibonacci mais próximo.
+- **RSI (14):** força relativa 0–100. Abaixo de 30 = sobrevendido; acima de 70 = sobrecomprado.
+- **Estocástico %K:** oscilador 0–100. Abaixo de 20 = fundo; acima de 80 = topo.
+- **Volume:** barras verdes (dia de alta) / vermelhas (baixa) + média móvel de 20.
+
+> **Importante:** os números do **card ao lado** (Preço, Queda, I.S., Sinais) vêm do TradingView (tempo quase real); o **gráfico** vem do Yahoo (fechamento). Pequenas diferenças entre eles são normais.
+                """)
 
             try:
                 df_ticker = obter_historico_ticker(ticker)
@@ -700,6 +740,21 @@ if 'oportunidades' in st.session_state:
             # === PAINEL FUNDAMENTALISTA (ABAIXO DO GRÁFICO) ===
             st.markdown("---")
             st.markdown('<h3 class="section-header">📊 Análise Fundamentalista</h3>', unsafe_allow_html=True)
+
+            with st.expander("ℹ️ O que é o score fundamentalista"):
+                st.markdown("""
+Avalia a **saúde da empresa-mãe** (não o preço da BDR), com um score **0–100%** a partir de uma base neutra de 50, somando bônus e penalidades:
+
+- **P/E Ratio (Preço/Lucro):** múltiplo de valuation. Baixo/moderado soma pontos; muito alto (>50) penaliza.
+- **Dividend Yield:** dividendo anual ÷ preço. Yields maiores somam pontos.
+- **Crescimento de Receita:** crescimento anual das vendas.
+- **Recomendação de Analistas:** consenso (compra/manter/venda).
+- **Market Cap:** porte da empresa.
+
+Faixas: **≥80% Excelente · 65–79 Bom · 50–64 Neutro · 35–49 Atenção · <35 Evitar**. As fontes são tentadas em cascata: **Yahoo Finance → OpenBB/FMP → BRAPI (B3)**.
+
+> É análise de **médio/longo prazo** — complementa (não substitui) a leitura técnica de curto prazo do swing trade.
+                """)
 
             with st.spinner(f"Buscando dados fundamentalistas de {ticker}..."):
                 fund_data = buscar_dados_fundamentalistas(ticker)
@@ -973,6 +1028,16 @@ if 'oportunidades' in st.session_state:
             # === SEÇÃO DE NOTÍCIAS ===
             st.markdown("---")
             st.markdown('<h3 class="section-header">📰 Últimas Notícias da Empresa</h3>', unsafe_allow_html=True)
+
+            with st.expander("ℹ️ Sobre as notícias"):
+                st.markdown("""
+Reúne as notícias dos **últimos 30 dias** da empresa-mãe, de várias fontes (Yahoo Finance, Google News, Seeking Alpha, MarketWatch, Finviz, GuruFocus), **traduzidas para o português**.
+
+- Um resumo de **análise de sentimento** (via IA) indica se o noticiário está mais positivo, neutro ou negativo, considerando a variação do dia.
+- Os cards trazem a manchete, a fonte e a data; os **links** levam à matéria original.
+
+> Use como **contexto qualitativo** — notícias explicam movimentos, mas não substituem a análise técnica e o gerenciamento de risco.
+                """)
 
             ticker_us_news    = mapear_ticker_us(ticker)
             # Nome da empresa: prioriza fund_data, depois NOMES_BDRS, depois row['Empresa']
