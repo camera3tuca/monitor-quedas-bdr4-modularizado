@@ -345,12 +345,12 @@ def gerar_sinal(row_ticker, df_ticker):
 
         # Penaliza o potencial em tendência de baixa: comprar contra a tendência
         # principal ("faca caindo") é um trade de maior risco, então o score cai
-        # e o Potencial nunca chega a "Muito Alta".
+        # e o Potencial fica limitado a no máximo "Média".
         if em_baixa:
             score = max(0, score - 3)
             classificacao = classificar(score)
-            if classificacao == "Muito Alta":
-                classificacao = "Alta"
+            if classificacao in ("Muito Alta", "Alta"):
+                classificacao = "Média"
         else:
             classificacao = classificar(score)
 

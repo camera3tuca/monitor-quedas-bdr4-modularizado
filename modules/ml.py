@@ -274,7 +274,7 @@ def prever_preco_ml(df_ticker, ticker, dias_previsao=5):
             'previsoes'     : previsoes,
             'direcao'       : direcao,
             'variacao_pct'  : round(variacao_pct, 2),
-            'confianca'     : round(max(0.0, confianca) * 100, 1),  # R² clampado ≥0 só p/ exibir
+            'confianca'     : round(confianca * 100, 1),  # R² real (pode ser negativo)
             'ultimo_preco'  : round(float(df['Close'].iloc[-1]), 2),
             'melhor_modelo' : melhor_nome,
             'ranking_modelos': ranking,
@@ -392,11 +392,12 @@ def renderizar_painel_ml(resultado_ml, ticker, empresa, dias_previsao=5):
 
         with col_conf:
             # Barra de progresso CSS + label explicativo claro
-            r2_val   = confianca           # já é 0–100
+            r2_val   = confianca           # R² em % (pode ser negativo)
             cor_c    = "#15803d" if r2_val >= 60 else "#b45309" if r2_val >= 30 else "#b91c1c"
             bg_bar_c = "#dcfce7" if r2_val >= 60 else "#fef3c7" if r2_val >= 30 else "#fee2e2"
-            nivel    = "Ajuste bom" if r2_val >= 60 else "Ajuste moderado" if r2_val >= 30 else "Ajuste fraco"
-            barra_w  = min(int(r2_val), 100)
+            nivel    = ("Ajuste bom" if r2_val >= 60 else "Ajuste moderado" if r2_val >= 30
+                        else "Ajuste fraco" if r2_val >= 0 else "Pior que a média (R²<0)")
+            barra_w  = max(0, min(int(r2_val), 100))   # largura nunca negativa
             st.markdown(f"""
             <div style='background:#f8fafc;border:2px solid #e2e8f0;padding:0.9rem 1rem;
                         border-radius:10px;min-height:115px;
@@ -413,7 +414,7 @@ def renderizar_painel_ml(resultado_ml, ticker, empresa, dias_previsao=5):
                 <div style='font-size:0.72rem;color:#64748b;'>
                     {nivel} &nbsp;·&nbsp; {icone_melhor} {nomes_pt.get(melhor_modelo, melhor_modelo)}</div>
                 <div style='font-size:0.67rem;color:#94a3b8;margin-top:0.15rem;'>
-                    R²=1 perfeito · R²=0 aleatório</div>
+                    R²=1 perfeito · R²=0 aleatório · R²&lt;0 pior que a média</div>
             </div>""", unsafe_allow_html=True)
 
         with col_var:
@@ -447,10 +448,10 @@ def renderizar_painel_ml(resultado_ml, ticker, empresa, dias_previsao=5):
                 cor_rank = "#15803d" if i == 0 else "#64748b"
                 borda_r  = "2px solid #22c55e" if i == 0 else "1px solid #e2e8f0"
                 bg_rank  = "#f0fdf4" if i == 0 else "#f8fafc"
-                r2_disp  = max(0.0, mod_info["r2"]) * 100
+                r2_disp  = mod_info["r2"] * 100   # R² real (pode ser negativo)
                 rmse_d   = mod_info["rmse"]
                 nome_c   = nomes_pt.get(mod_info["nome"], mod_info["nome"])
-                barra_w  = min(int(r2_disp * 2), 100)
+                barra_w  = max(0, min(int(r2_disp * 2), 100))
                 bar_cor  = "#22c55e" if i == 0 else "#94a3b8"
                 with cols_top[i]:
                     st.markdown(f"""
@@ -474,7 +475,7 @@ def renderizar_painel_ml(resultado_ml, ticker, empresa, dias_previsao=5):
                 cols_bot = st.columns(len(ranking) - 3)
                 for i, mod_info in enumerate(ranking[3:]):
                     idx = i + 3
-                    r2_disp = max(0.0, mod_info["r2"]) * 100
+                    r2_disp = mod_info["r2"] * 100   # R² real (pode ser negativo)
                     rmse_d  = mod_info["rmse"]
                     nome_c  = nomes_pt.get(mod_info["nome"], mod_info["nome"])
                     with cols_bot[i]:
