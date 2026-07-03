@@ -54,7 +54,7 @@ def prever_preco_ml(df_ticker, ticker, dias_previsao=5):
       - Elastic Net (regularização L1+L2)
       - Linear Regression (baseline)
 
-    O melhor modelo (R² no conjunto de teste) é selecionado automaticamente.
+    O melhor modelo (menor RMSE no conjunto de teste) é selecionado automaticamente.
 
     Features (inspiradas no notebook de Stock Price Prediction):
       - Retornos log em múltiplos horizontes: 1d, 5d, 15d, 30d (multi-period returns)
@@ -174,7 +174,9 @@ def prever_preco_ml(df_ticker, ticker, dias_previsao=5):
         for nome, mod in candidatos.items():
             try:
                 mod.fit(X_train_sc, y_train)
-                r2   = max(0.0, float(r2_score(y_test, mod.predict(X_test_sc))))
+                # R² cru (pode ser negativo em séries financeiras). NÃO é zerado
+                # aqui, senão todos empatam e a seleção/ordenação fica arbitrária.
+                r2   = float(r2_score(y_test, mod.predict(X_test_sc)))
                 rmse = float(np.sqrt(mean_squared_error(y_test, mod.predict(X_test_sc))))
                 resultados_modelos[nome] = {'modelo': mod, 'r2': r2, 'rmse': rmse}
             except Exception:
@@ -183,17 +185,19 @@ def prever_preco_ml(df_ticker, ticker, dias_previsao=5):
         if not resultados_modelos:
             return {'erro': 'Todos os modelos falharam no treinamento.'}
 
-        # Seleciona o melhor por R²
-        melhor_nome = max(resultados_modelos, key=lambda n: resultados_modelos[n]['r2'])
+        # Seleciona o melhor pelo MENOR RMSE. No mesmo conjunto de teste, menor
+        # RMSE = maior R² — mas o RMSE nunca "empata em zero" como o R² clampado,
+        # então é o critério robusto (evita escolher um modelo pior só por ordem).
+        melhor_nome = min(resultados_modelos, key=lambda n: resultados_modelos[n]['rmse'])
         melhor      = resultados_modelos[melhor_nome]
         modelo      = melhor['modelo']
         confianca   = melhor['r2']
 
-        # Ranking completo para exibição
+        # Ranking completo para exibição — do menor para o maior RMSE (melhor primeiro)
         ranking = sorted(
             [{'nome': n, 'r2': v['r2'], 'rmse': v['rmse']}
              for n, v in resultados_modelos.items()],
-            key=lambda x: x['r2'], reverse=True
+            key=lambda x: x['rmse']
         )
 
         # ── Previsão iterativa ────────────────────────────────────────────────────
@@ -270,7 +274,7 @@ def prever_preco_ml(df_ticker, ticker, dias_previsao=5):
             'previsoes'     : previsoes,
             'direcao'       : direcao,
             'variacao_pct'  : round(variacao_pct, 2),
-            'confianca'     : round(confianca * 100, 1),
+            'confianca'     : round(max(0.0, confianca) * 100, 1),  # R² clampado ≥0 só p/ exibir
             'ultimo_preco'  : round(float(df['Close'].iloc[-1]), 2),
             'melhor_modelo' : melhor_nome,
             'ranking_modelos': ranking,
@@ -346,7 +350,7 @@ def renderizar_painel_ml(resultado_ml, ticker, empresa, dias_previsao=5):
                         Modelo selecionado: {nomes_pt.get(melhor_modelo, melhor_modelo)}
                     </div>
                     <div style='color:#c7d2fe;font-size:0.78rem;'>
-                        Melhor R² entre 5 algoritmos treinados simultaneamente
+                        Menor erro (RMSE) entre 5 algoritmos treinados simultaneamente
                     </div>
                 </div>
             </div>
@@ -443,7 +447,7 @@ def renderizar_painel_ml(resultado_ml, ticker, empresa, dias_previsao=5):
                 cor_rank = "#15803d" if i == 0 else "#64748b"
                 borda_r  = "2px solid #22c55e" if i == 0 else "1px solid #e2e8f0"
                 bg_rank  = "#f0fdf4" if i == 0 else "#f8fafc"
-                r2_disp  = mod_info["r2"] * 100
+                r2_disp  = max(0.0, mod_info["r2"]) * 100
                 rmse_d   = mod_info["rmse"]
                 nome_c   = nomes_pt.get(mod_info["nome"], mod_info["nome"])
                 barra_w  = min(int(r2_disp * 2), 100)
@@ -470,7 +474,7 @@ def renderizar_painel_ml(resultado_ml, ticker, empresa, dias_previsao=5):
                 cols_bot = st.columns(len(ranking) - 3)
                 for i, mod_info in enumerate(ranking[3:]):
                     idx = i + 3
-                    r2_disp = mod_info["r2"] * 100
+                    r2_disp = max(0.0, mod_info["r2"]) * 100
                     rmse_d  = mod_info["rmse"]
                     nome_c  = nomes_pt.get(mod_info["nome"], mod_info["nome"])
                     with cols_bot[i]:
