@@ -318,12 +318,19 @@ def gerar_sinal(row_ticker, df_ticker):
         ema200 = row_ticker.get('EMA200')
         if pd.notna(close) and pd.notna(ema50) and pd.notna(ema200):
             if close > ema200 and ema50 >= ema200:
-                sinais.append("Correção em Alta")
-                explicacoes.append("📈 Queda dentro de tendência de alta (preço > EMA200 e EMA50 ≥ EMA200): correção, não reversão de baixa")
-                score += 2
-                if pd.notna(ema20) and ema20 <= close <= ema20 * 1.03:
-                    sinais.append("Suporte EMA20")
-                    explicacoes.append("🎯 Preço recuando até a EMA20 (suporte de curto prazo) em tendência de alta")
+                # Estrutura de alta. Distingue a correção RASA (acima da EMA50,
+                # pullback saudável) da PROFUNDA (furou a EMA50 e testa a EMA200).
+                if close >= ema50:
+                    sinais.append("Correção em Alta")
+                    explicacoes.append("📈 Correção rasa em tendência de alta (preço acima da EMA50): pullback saudável para comprar")
+                    score += 2
+                    if pd.notna(ema20) and ema20 <= close <= ema20 * 1.03:
+                        sinais.append("Suporte EMA20")
+                        explicacoes.append("🎯 Preço recuando até a EMA20 (suporte de curto prazo) em tendência de alta")
+                        score += 1
+                else:
+                    sinais.append("Testando EMA200")
+                    explicacoes.append("🟡 Correção profunda: preço abaixo da EMA50, testando a EMA200 (último suporte da tendência de alta) — zona de decisão, exige confirmação")
                     score += 1
             elif close < ema200:
                 em_baixa = True

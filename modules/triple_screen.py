@@ -108,18 +108,35 @@ def analisar_triple_screen(df_ticker):
         if efi2_val < limiar_neg:
             tela2_status = "SOBREVENDA"
             tela2_emoji  = "🟢"
-            tela2_desc   = (
+            # O contexto depende da MARÉ real (1ª Tela): só sobrevenda em maré de
+            # ALTA é sinal de compra. Em maré de baixa, é possível continuação.
+            if tela1_status == "ALTA":
+                _ctx = "Como a maré (1ª Tela) está de alta, este é o momento de buscar entrada de COMPRA."
+            elif tela1_status == "BAIXA":
+                _ctx = ("⚠️ Mas a maré (1ª Tela) está de BAIXA: sobrevenda em tendência de baixa "
+                        "NÃO é sinal de compra — pode ser continuação da queda. Elder recomenda "
+                        "não operar contra a maré.")
+            else:
+                _ctx = "Aguarde a maré (1ª Tela) definir a direção antes de agir."
+            tela2_desc = (
                 f"EFI(2) = {efi2_val:,.0f} (abaixo do limiar {limiar_neg:,.0f}). "
                 "A ONDA está em sobrevenda — compradores começando a absorver a pressão vendedora. "
-                "Em tendência de alta (1ª Tela), este é o momento de buscar entrada."
+                + _ctx
             )
         elif efi2_val > limiar_pos:
             tela2_status = "SOBRECOMPRA"
             tela2_emoji  = "🔴"
-            tela2_desc   = (
+            if tela1_status == "BAIXA":
+                _ctx = "Como a maré (1ª Tela) está de baixa, este é o momento de buscar saída/VENDA."
+            elif tela1_status == "ALTA":
+                _ctx = ("Mas a maré (1ª Tela) está de ALTA: sobrecompra em tendência de alta "
+                        "costuma ser apenas um repique — pode continuar subindo, não é sinal de venda.")
+            else:
+                _ctx = "Aguarde a maré (1ª Tela) definir a direção antes de agir."
+            tela2_desc = (
                 f"EFI(2) = {efi2_val:,.0f} (acima do limiar {limiar_pos:,.0f}). "
                 "A ONDA está em sobrecompra — vendedores começando a pressionar. "
-                "Em tendência de baixa (1ª Tela), este é o momento de buscar saída/venda."
+                + _ctx
             )
         else:
             tela2_status = "NEUTRO"
