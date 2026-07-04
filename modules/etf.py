@@ -560,21 +560,21 @@ def renderizar_painel_etf(dados, ticker_bdr, empresa):
         descricao     = dados.get('descricao', '')
         moeda         = dados.get('moeda', '$')
 
-        # ── Cabeçalho ─────────────────────────────────────────────────────────
+        # ── Cabeçalho (estilo claro e uniforme) ───────────────────────────────
         st.markdown(f"""
-        <div style='background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);
-                    padding:1rem 1.4rem;border-radius:12px;margin-bottom:1rem;'>
-            <div style='display:flex;align-items:center;gap:0.8rem;margin-bottom:0.4rem;'>
-                <span style='font-size:1.8rem;'>🧺</span>
+        <div style='background:#f8fafc;border:1px solid #e2e8f0;border-left:5px solid #667eea;
+                    padding:0.95rem 1.2rem;border-radius:10px;margin-bottom:1rem;'>
+            <div style='display:flex;align-items:center;gap:0.7rem;margin-bottom:0.4rem;'>
+                <span style='font-size:1.7rem;'>🧺</span>
                 <div>
-                    <div style='color:#93c5fd;font-weight:800;font-size:1rem;'>
+                    <div style='color:#1e293b;font-weight:800;font-size:1rem;'>
                         {nome}</div>
-                    <div style='color:#bfdbfe;font-size:0.78rem;'>
+                    <div style='color:#64748b;font-size:0.78rem;'>
                         {ticker_bdr} (B3) · {ticker_fonte} (Fundo) · {familia}</div>
                 </div>
             </div>
-            <p style='margin:0;color:#bfdbfe;font-size:0.78rem;'>
-                📂 <strong style='color:#93c5fd;'>Categoria:</strong> {categoria}
+            <p style='margin:0;color:#475569;font-size:0.78rem;'>
+                📂 <strong style='color:#334155;'>Categoria:</strong> {categoria}
             </p>
         </div>""", unsafe_allow_html=True)
 
