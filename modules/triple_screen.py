@@ -248,25 +248,25 @@ def renderizar_triple_screen(resultado, ticker, empresa):
         t2        = resultado['tela2']
         t3        = resultado['tela3']
 
-        # ── Cabeçalho explicativo ────────────────────────────────────────────────────
+        # ── Cabeçalho explicativo (estilo claro e uniforme) ──────────────────────────
         st.markdown("""
-        <div style='background:linear-gradient(135deg,#0f2027 0%,#203a43 50%,#2c5364 100%);
-                    padding:1rem 1.3rem;border-radius:10px;margin-bottom:1.2rem;'>
-            <p style='margin:0;color:#cfd8dc;font-size:0.83rem;line-height:1.65;'>
-                🧠 <strong style='color:#80cbc4;'>Como funciona o Triple Screen:</strong>
+        <div style='background:#f8fafc;border:1px solid #e2e8f0;border-left:5px solid #667eea;
+                    padding:0.95rem 1.2rem;border-radius:10px;margin-bottom:1.2rem;'>
+            <p style='margin:0;color:#475569;font-size:0.83rem;line-height:1.65;'>
+                ℹ️ <strong style='color:#334155;'>Como funciona o Triple Screen:</strong>
                 Criado por <strong>Alexander Elder</strong> em 1986, combina três "telas" em
                 timeframes diferentes para filtrar ruído e confirmar tendências.
                 A metáfora do oceano: negocie com a <em>maré</em>, não contra ela.<br><br>
-                🌊 <strong style='color:#80deea;'>1ª Tela — A Maré (EMA13 + MACD):</strong>
+                🌊 <strong style='color:#1e293b;'>1ª Tela — A Maré (EMA13 + MACD):</strong>
                 A <strong>inclinação da EMA13</strong> define a tendência dominante —
                 é a tela mais importante. O MACD(12,26,9) reforça a direção.
                 Elder original usa EMA13 <em>semanal</em>;
                 adaptamos para <em>diário</em> por ser nosso único timeframe.<br>
-                🌀 <strong style='color:#80deea;'>2ª Tela — A Onda (EFI 2):</strong>
+                🌀 <strong style='color:#1e293b;'>2ª Tela — A Onda (EFI 2):</strong>
                 O <strong>Force Index(2)</strong> oscila dentro da tendência maior,
                 identificando correções (sobrevenda em uptrend = oportunidade de compra)
                 e repiques (sobrecompra em downtrend = oportunidade de venda).<br>
-                🎯 <strong style='color:#80deea;'>3ª Tela — A Execução:</strong>
+                🎯 <strong style='color:#1e293b;'>3ª Tela — A Execução:</strong>
                 Sem indicador — usa a <em>ação do preço</em>.
                 Buy Stop acima da máxima recente (compra) ou
                 Sell Stop abaixo da mínima recente (venda).

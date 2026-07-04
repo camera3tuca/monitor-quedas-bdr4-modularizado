@@ -341,28 +341,28 @@ def renderizar_painel_ml(resultado_ml, ticker, empresa, dias_previsao=5):
             'LinearRegression': 'Regressão Linear',
         }
         st.markdown(f"""
-        <div style='background:linear-gradient(135deg,#1e1b4b 0%,#312e81 100%);
-                    padding:1rem 1.4rem;border-radius:12px;margin-bottom:1rem;'>
-            <div style='display:flex;align-items:center;gap:0.8rem;margin-bottom:0.6rem;'>
-                <span style='font-size:1.8rem;'>{icone_melhor}</span>
+        <div style='background:#f8fafc;border:1px solid #e2e8f0;border-left:5px solid #667eea;
+                    padding:0.95rem 1.2rem;border-radius:10px;margin-bottom:1rem;'>
+            <div style='display:flex;align-items:center;gap:0.7rem;margin-bottom:0.5rem;'>
+                <span style='font-size:1.7rem;'>{icone_melhor}</span>
                 <div>
-                    <div style='color:#a5b4fc;font-weight:800;font-size:1rem;'>
+                    <div style='color:#1e293b;font-weight:800;font-size:1rem;'>
                         Modelo selecionado: {nomes_pt.get(melhor_modelo, melhor_modelo)}
                     </div>
-                    <div style='color:#c7d2fe;font-size:0.78rem;'>
+                    <div style='color:#64748b;font-size:0.78rem;'>
                         Menor erro (RMSE) entre 5 algoritmos treinados simultaneamente
                     </div>
                 </div>
             </div>
-            <p style='margin:0;color:#c7d2fe;font-size:0.80rem;line-height:1.6;'>
-                🧠 <strong style='color:#a5b4fc;'>Framework Ensemble:</strong>
+            <p style='margin:0;color:#475569;font-size:0.82rem;line-height:1.6;'>
+                ℹ️ <strong style='color:#334155;'>Framework Ensemble:</strong>
                 Cinco modelos (Gradient Boosting, Random Forest, Extra Trees, Elastic Net, Regressão Linear)
                 foram treinados com <strong>{n_features} features</strong> derivadas de retornos logarítmicos
                 em múltiplos horizontes (1d, 5d, 15d, 30d), volatilidade realizada, distância às EMAs,
                 RSI14 e Bollinger %B. O target é o retorno log do próximo dia, reconvertido para preço.
                 O melhor modelo no conjunto de teste (split 80/20 temporal) é usado para a previsão.
                 <br><br>
-                ⚠️ <strong style='color:#fbbf24;'>Aviso:</strong>
+                ⚠️ <strong style='color:#b45309;'>Aviso:</strong>
                 Previsões de ML são estimativas estatísticas, não garantias.
                 Use como <u>um dos critérios</u> da sua análise, nunca como único sinal.
             </p>
