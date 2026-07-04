@@ -425,14 +425,14 @@ def renderizar_painel_tradingview(dados, ticker_us, empresa, peers=None):
         fonte_icon  = '📡' if 'TradingView' in fonte_dados else '📊'
         fonte_label = fonte_dados
         st.markdown(f"""
-        <div style='background:linear-gradient(135deg,#131722 0%,#1e2a3a 100%);
-                    padding:0.9rem 1.2rem;border-radius:12px;margin-bottom:1rem;
+        <div style='background:#f8fafc;border:1px solid #e2e8f0;border-left:5px solid #667eea;
+                    padding:0.85rem 1.2rem;border-radius:10px;margin-bottom:1rem;
                     display:flex;align-items:center;gap:0.8rem;'>
-            <span style='font-size:1.8rem;'>{fonte_icon}</span>
+            <span style='font-size:1.7rem;'>{fonte_icon}</span>
             <div>
-                <div style='color:#2962ff;font-weight:800;font-size:1rem;'>
+                <div style='color:#1e293b;font-weight:800;font-size:1rem;'>
                     {fonte_label} — {ticker_us} ({empresa})</div>
-                <div style='color:#787b86;font-size:0.75rem;'>
+                <div style='color:#64748b;font-size:0.75rem;'>
                     {'Dados via API TradingView · github.com/shner-elmo/TradingView-Screener' if 'TradingView' in fonte_dados else 'Dados via yfinance · indicadores calculados localmente'}
                     · Atualizado a cada 5 min</div>
             </div>
