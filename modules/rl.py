@@ -299,21 +299,21 @@ def renderizar_painel_rl(resultado_rl, ticker, empresa):
 
         # ── Cabeçalho ─────────────────────────────────────────────────────────────
         st.markdown(f"""
-        <div style='background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);
-                    padding:1rem 1.4rem;border-radius:12px;margin-bottom:1rem;'>
-            <div style='display:flex;align-items:center;gap:0.8rem;margin-bottom:0.6rem;'>
-                <span style='font-size:2rem;'>🎮</span>
+        <div style='background:#f8fafc;border:1px solid #e2e8f0;border-left:5px solid #667eea;
+                    padding:0.95rem 1.2rem;border-radius:10px;margin-bottom:1rem;'>
+            <div style='display:flex;align-items:center;gap:0.7rem;margin-bottom:0.5rem;'>
+                <span style='font-size:1.9rem;'>🎮</span>
                 <div>
-                    <div style='color:#93c5fd;font-weight:800;font-size:1rem;'>
+                    <div style='color:#1e293b;font-weight:800;font-size:1rem;'>
                         Deep Q-Learning (DQN) — Agente de Trading
                     </div>
-                    <div style='color:#bfdbfe;font-size:0.78rem;'>
+                    <div style='color:#64748b;font-size:0.78rem;'>
                         Treinado por {episodios} episódios · Estado: janela de {window_size} dias · Ações: Hold / Buy / Sell
                     </div>
                 </div>
             </div>
-            <p style='margin:0;color:#bfdbfe;font-size:0.80rem;line-height:1.65;'>
-                🤖 <strong style='color:#93c5fd;'>Como funciona:</strong>
+            <p style='margin:0;color:#475569;font-size:0.82rem;line-height:1.65;'>
+                ℹ️ <strong style='color:#334155;'>Como funciona:</strong>
                 O agente observa as <em>diferenças de preço</em> numa janela deslizante (estado),
                 decide entre <strong>Comprar, Vender ou Aguardar</strong> (ação) e recebe como recompensa
                 o <strong>PnL realizado</strong> em cada venda. Uma rede neural MLP (64→32 neurônios, ReLU)
@@ -321,7 +321,7 @@ def renderizar_painel_rl(resultado_rl, ticker, empresa):
                 O treinamento usa <strong>Experience Replay</strong> (buffer de 500 transações, mini-batch de 32)
                 e política <strong>ε-greedy</strong> com decaimento progressivo do ε.
                 <br><br>
-                ⚠️ <strong style='color:#fbbf24;'>Aviso:</strong>
+                ⚠️ <strong style='color:#b45309;'>Aviso:</strong>
                 RL é altamente sensível à qualidade dos dados e ao número de episódios.
                 Use como sinal complementar — nunca como único critério de decisão.
             </p>
