@@ -531,8 +531,24 @@ O gráfico tem **4 painéis** (histórico via Yahoo; escolha o *timeframe* diár
             try:
                 df_ticker = obter_historico_ticker(ticker)
                 df_ticker = df_ticker.dropna() if df_ticker is not None else pd.DataFrame()
+
+                # Fallback: se a BDR não tem histórico no Yahoo (comum em BDRs novas/
+                # ilíquidas), usa o gráfico do ATIVO US subjacente, convertido para a
+                # cotação atual da BDR (mesma forma/indicadores, só a escala muda).
+                fonte_grafico_us = None
+                if df_ticker.empty:
+                    _ticker_us_graf = mapear_ticker_us(ticker)
+                    if _ticker_us_graf and _ticker_us_graf != ticker:
+                        _df_us = obter_historico_us_escalado(_ticker_us_graf, row['Preco'])
+                        if _df_us is not None and not _df_us.dropna().empty:
+                            df_ticker = _df_us.dropna()
+                            fonte_grafico_us = _ticker_us_graf
+
                 if df_ticker.empty:
                     raise ValueError(f"Sem histórico disponível para {ticker} (Yahoo pode ter bloqueado). Tente novamente em instantes.")
+
+                if fonte_grafico_us:
+                    st.caption(f"ℹ️ Sem histórico da BDR na B3 — exibindo o gráfico do ativo subjacente **{fonte_grafico_us}** (EUA), convertido pela cotação atual da BDR. Forma e indicadores são os mesmos; a escala é aproximada.")
 
                 # As métricas do detalhe (preço, queda, EMAs, sinais) vêm do screener
                 # (TradingView) — fonte atual e a MESMA base do filtro de EMAs. Para
