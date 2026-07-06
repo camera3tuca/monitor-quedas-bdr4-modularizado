@@ -746,6 +746,40 @@ def obter_historico_ticker(ticker, periodo=PERIODO):
         return None
 
 
+@st.cache_data(ttl=900, show_spinner=False)
+def obter_historico_us_escalado(ticker_us, preco_bdr, periodo=PERIODO):
+    """Fallback do gráfico: histórico do ATIVO US subjacente, com os preços
+    escalados para a cotação atual da BDR.
+
+    Usado quando a BDR ``.SA`` não tem histórico no Yahoo (comum em BDRs novas/
+    ilíquidas), mas o ativo US (ex.: AMBA) tem série completa. Como a BDR replica
+    o ativo, a forma do gráfico e os indicadores são os mesmos — só a escala de
+    preço muda. Multiplica OHLC pelo fator ``preco_bdr / último_close_US`` para
+    exibir em R$ equivalente, coerente com o card. Retorna DataFrame ou ``None``.
+    """
+    try:
+        df = _yf_baixar(ticker_us, period=periodo, auto_adjust=True,
+                        progress=False, timeout=30)
+        if df is None or df.empty:
+            return None
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        df = df.dropna(subset=['Close'])
+        if df.empty:
+            return None
+        try:
+            ratio = float(preco_bdr) / float(df['Close'].iloc[-1])
+        except (TypeError, ValueError, ZeroDivisionError):
+            ratio = 1.0
+        if ratio and ratio > 0 and ratio != 1.0:
+            for c in ('Open', 'High', 'Low', 'Close'):
+                if c in df.columns:
+                    df[c] = df[c] * ratio
+        return _indicadores_basicos(df)   # indicadores sobre os preços já escalados
+    except Exception:
+        return None
+
+
 def plotar_grafico(df_ticker, ticker, empresa, rsi, is_val,
                    timeframe='Diário', zoom_periods=None, tipo_grafico='Linha',
                    df_horario=None, preco_atual=None, emas_atual=None):
