@@ -535,14 +535,20 @@ O gráfico tem **4 painéis** (histórico via Yahoo; escolha o *timeframe* diár
                 # Fallback: se a BDR não tem histórico no Yahoo (comum em BDRs novas/
                 # ilíquidas), usa o gráfico do ATIVO US subjacente, convertido para a
                 # cotação atual da BDR (mesma forma/indicadores, só a escala muda).
+                # Dispara também quando o histórico da BDR é CURTO demais (Yahoo traz
+                # só uns dias), usando o US se ele tiver mais barras — evita gráfico
+                # "achatado" de poucos dias como no A1PP34.
                 fonte_grafico_us = None
-                if df_ticker.empty:
+                _MIN_BARRAS_GRAF = 40
+                if df_ticker.empty or len(df_ticker) < _MIN_BARRAS_GRAF:
                     _ticker_us_graf = mapear_ticker_us(ticker)
                     if _ticker_us_graf and _ticker_us_graf != ticker:
                         _df_us = obter_historico_us_escalado(_ticker_us_graf, row['Preco'])
-                        if _df_us is not None and not _df_us.dropna().empty:
-                            df_ticker = _df_us.dropna()
-                            fonte_grafico_us = _ticker_us_graf
+                        if _df_us is not None:
+                            _df_us = _df_us.dropna()
+                            if len(_df_us) > len(df_ticker):
+                                df_ticker = _df_us
+                                fonte_grafico_us = _ticker_us_graf
 
                 if df_ticker.empty:
                     raise ValueError(f"Sem histórico disponível para {ticker} (Yahoo pode ter bloqueado). Tente novamente em instantes.")
@@ -648,7 +654,12 @@ O gráfico tem **4 painéis** (histórico via Yahoo; escolha o *timeframe* diár
                     _periodo_tf = {'Semanal': '5y', 'Mensal': 'max'}.get(timeframe_sel)
                     if _periodo_tf:
                         try:
-                            _df_longo = obter_historico_ticker(ticker, periodo=_periodo_tf)
+                            # Se o gráfico está no fallback US, puxa o histórico longo
+                            # também do ativo US; senão, da própria BDR.
+                            if fonte_grafico_us:
+                                _df_longo = obter_historico_us_escalado(fonte_grafico_us, row['Preco'], periodo=_periodo_tf)
+                            else:
+                                _df_longo = obter_historico_ticker(ticker, periodo=_periodo_tf)
                             if _df_longo is not None and not _df_longo.dropna(subset=['Close']).empty:
                                 df_ticker_plot = _df_longo
                         except Exception:
@@ -819,6 +830,9 @@ Faixas: **≥80% Excelente · 65–79 Bom · 50–64 Neutro · 35–49 Atenção
                 else:
                     st.success(f"📡 **Fonte:** {fonte} | Ticker US: **{ticker_fonte}**")
 
+                # Moeda dos valores: BRAPI é dado da B3 (em reais); Yahoo/FMP em dólar.
+                moeda_fund = 'R$' if 'BRAPI' in fonte else '$'
+
                 # Métricas em colunas
                 col1, col2, col3 = st.columns(3)
 
@@ -832,9 +846,9 @@ Faixas: **≥80% Excelente · 65–79 Bom · 50–64 Neutro · 35–49 Atenção
                     if fund_data.get('market_cap'):
                         mcap_b = fund_data['market_cap'] / 1e9
                         if mcap_b >= 1000:
-                            st.metric("Market Cap", f"${mcap_b/1000:.2f}T")
+                            st.metric("Market Cap", f"{moeda_fund}{mcap_b/1000:.2f}T")
                         else:
-                            st.metric("Market Cap", f"${mcap_b:.1f}B")
+                            st.metric("Market Cap", f"{moeda_fund}{mcap_b:.1f}B")
                     else:
                         st.metric("Market Cap", "N/A")
 
@@ -899,9 +913,9 @@ Faixas: **≥80% Excelente · 65–79 Bom · 50–64 Neutro · 35–49 Atenção
                     if mcap_det.get('valor'):
                         mcap_val = mcap_det['valor'] / 1e9
                         if mcap_val >= 1000:
-                            valor_str = f"${mcap_val/1000:.2f}T"
+                            valor_str = f"{moeda_fund}{mcap_val/1000:.2f}T"
                         else:
-                            valor_str = f"${mcap_val:.1f}B"
+                            valor_str = f"{moeda_fund}{mcap_val:.1f}B"
                         dados_tabela.append({
                             'Métrica': 'Market Cap',
                             'Valor': valor_str,
@@ -959,9 +973,9 @@ Faixas: **≥80% Excelente · 65–79 Bom · 50–64 Neutro · 35–49 Atenção
                     if mcap_det.get('valor'):
                         mcap_val = mcap_det['valor'] / 1e9
                         if mcap_val >= 1000:
-                            valor_str = f"${mcap_val/1000:.2f}T"
+                            valor_str = f"{moeda_fund}{mcap_val/1000:.2f}T"
                         else:
-                            valor_str = f"${mcap_val:.1f}B"
+                            valor_str = f"{moeda_fund}{mcap_val:.1f}B"
                         dados_tabela.append({
                             'Métrica': 'Market Cap',
                             'Valor': valor_str,
