@@ -456,7 +456,16 @@ def renderizar_painel_rl(resultado_rl, ticker, empresa):
 
         # ── Tabela de operações ────────────────────────────────────────────────────
         if vendas:
-            st.markdown("**📋 Operações de Venda no Conjunto de Teste:**")
+            # Resumo: taxa de acerto + resultado, para o total (que pode ser negativo
+            # mesmo com várias operações de lucro no topo da lista) fazer sentido.
+            n_lucro = sum(1 for v in vendas if v[2] >= 0)
+            n_prej  = len(vendas) - n_lucro
+            taxa    = (n_lucro / len(vendas) * 100) if vendas else 0
+            st.markdown(
+                f"**📋 Operações de Venda no Conjunto de Teste** — "
+                f"{len(vendas)} operações · ✅ {n_lucro} lucro · ❌ {n_prej} prejuízo · "
+                f"acerto **{taxa:.0f}%** · resultado **{'+' if lucro_teste >= 0 else ''}R\\${lucro_teste:.2f}**"
+            )
             ops_data = []
             for i, v in enumerate(vendas):
                 pnl = v[2]
