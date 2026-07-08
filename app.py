@@ -464,10 +464,10 @@ Os filtros ajudam a focar em **correções dentro de tendências de alta** (o ob
 Lista as BDRs que **caíram no dia** e podem ser oportunidades de compra (correção). Dados ao vivo do TradingView, ordenados da maior para a menor queda.
 
 - **Empresa / Liq. (💧):** nome do BDR e **ranking de liquidez 0–10** (pelo volume financeiro médio/dia). Quanto maior, menor o risco de spread/gap e mais fácil entrar e sair.
-- **Preço:** cotação atual da BDR na B3 (R$).
+- **Preço:** cotação atual da BDR na B3 (R\$).
 - **Queda_Dia:** variação % no dia (a tabela só mostra quedas).
 - **I.S. (Índice de Sobrevenda):** `((100−RSI)+(100−Estocástico))/2`. Quanto **maior**, mais sobrevendido (0–100).
-- **Vol. R$:** volume financeiro médio negociado por dia (R$).
+- **Vol. R\$:** volume financeiro médio negociado por dia (R\$).
 - **Gap:** diferença % entre a **abertura** de hoje e o **fechamento anterior**.
 - **Sinal (Potencial):** qualidade da oportunidade — Baixa / Média / Alta / Muito Alta. Em **tendência de baixa** (abaixo da EMA200) fica limitado a "Média".
 - **Força:** pontuação 0–10 somando os sinais detectados.
