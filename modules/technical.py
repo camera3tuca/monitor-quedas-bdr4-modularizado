@@ -753,9 +753,13 @@ def obter_historico_us_escalado(ticker_us, preco_bdr, periodo=PERIODO):
 
     Usado quando a BDR ``.SA`` não tem histórico no Yahoo (comum em BDRs novas/
     ilíquidas), mas o ativo US (ex.: AMBA) tem série completa. Como a BDR replica
-    o ativo, a forma do gráfico e os indicadores são os mesmos — só a escala de
-    preço muda. Multiplica OHLC pelo fator ``preco_bdr / último_close_US`` para
-    exibir em R$ equivalente, coerente com o card. Retorna DataFrame ou ``None``.
+    o ativo, a forma do gráfico e os indicadores são os mesmos.
+
+    Para casar melhor com a cotação real da BDR na B3, converte o histórico US
+    pelo **câmbio histórico USD/BRL** (o BDR ≈ preço_US × câmbio), e só então
+    escala para casar com a cotação ATUAL da BDR. Se o câmbio histórico não
+    estiver disponível, cai para uma escala constante (câmbio de hoje).
+    Retorna DataFrame ou ``None``.
     """
     try:
         df = _yf_baixar(ticker_us, period=periodo, auto_adjust=True,
@@ -767,15 +771,37 @@ def obter_historico_us_escalado(ticker_us, preco_bdr, periodo=PERIODO):
         df = df.dropna(subset=['Close'])
         if df.empty:
             return None
+
+        precos = ['Open', 'High', 'Low', 'Close']
+
+        # 1) Converte pelo câmbio histórico (USD/BRL) — deixa a curva acompanhar
+        #    o FX real, como no gráfico da BDR na B3.
+        try:
+            fx = _yf_baixar('USDBRL=X', period=periodo, auto_adjust=True,
+                            progress=False, timeout=20)
+            if fx is not None and not fx.empty:
+                if isinstance(fx.columns, pd.MultiIndex):
+                    fx.columns = fx.columns.get_level_values(0)
+                fx_close = fx['Close'].reindex(df.index).ffill().bfill()
+                if fx_close.notna().any():
+                    for c in precos:
+                        if c in df.columns:
+                            df[c] = df[c] * fx_close
+        except Exception:
+            pass
+
+        # 2) Escala final para casar com a cotação ATUAL da BDR (absorve a razão
+        #    de conversão do BDR e qualquer resíduo).
         try:
             ratio = float(preco_bdr) / float(df['Close'].iloc[-1])
         except (TypeError, ValueError, ZeroDivisionError):
             ratio = 1.0
         if ratio and ratio > 0 and ratio != 1.0:
-            for c in ('Open', 'High', 'Low', 'Close'):
+            for c in precos:
                 if c in df.columns:
                     df[c] = df[c] * ratio
-        return _indicadores_basicos(df)   # indicadores sobre os preços já escalados
+
+        return _indicadores_basicos(df)   # indicadores sobre os preços já convertidos
     except Exception:
         return None
 
