@@ -11,15 +11,176 @@ import warnings
 import xml.etree.ElementTree as ET
 import html as html_lib
 import re
+import math
+
+
+def _tv_num(v, casas=None):
+    """Converte para float com segurança (TradingView pode devolver None/NaN)."""
+    try:
+        if v is None:
+            return None
+        fv = float(v)
+        if math.isnan(fv) or math.isinf(fv):
+            return None
+        return round(fv, casas) if casas is not None else fv
+    except (TypeError, ValueError):
+        return None
+
+
+def _tv_rec_label(v):
+    """Rótulo/cor a partir do Recommend.All do TradingView (-1 a +1)."""
+    if v is None:
+        return 'N/A', '#94a3b8'
+    if   v >=  0.5: return 'FORTE COMPRA', '#15803d'
+    elif v >=  0.1: return 'COMPRA',        '#16a34a'
+    elif v >= -0.1: return 'NEUTRO',         '#b45309'
+    elif v >= -0.5: return 'VENDA',          '#dc2626'
+    else:           return 'FORTE VENDA',   '#7f1d1d'
+
+
+# TradingView usa uma classificação de setores diferente do Yahoo; mapeia as mais
+# comuns para as chaves de PEERS_POR_SETOR (senão os peers ficariam vazios).
+_TV_SETOR_YAHOO = {
+    'Technology Services': 'Technology', 'Electronic Technology': 'Technology',
+    'Finance': 'Financial Services', 'Health Technology': 'Healthcare',
+    'Health Services': 'Healthcare', 'Retail Trade': 'Consumer Cyclical',
+    'Consumer Durables': 'Consumer Cyclical', 'Consumer Services': 'Consumer Cyclical',
+    'Consumer Non-Durables': 'Consumer Defensive', 'Communications': 'Communication Services',
+    'Energy Minerals': 'Energy', 'Producer Manufacturing': 'Industrials',
+    'Industrial Services': 'Industrials', 'Transportation': 'Industrials',
+    'Commercial Services': 'Industrials', 'Distribution Services': 'Industrials',
+    'Utilities': 'Utilities', 'Process Industries': 'Basic Materials',
+    'Non-Energy Minerals': 'Basic Materials',
+}
+
+
+def _buscar_tv_screener(ticker_us):
+    """Dados REAIS do TradingView (mercado 'america') para o ticker US, no mesmo
+    formato do dict do painel — incluindo a recomendação oficial (Recommend.All).
+    Retorna ``None`` se a lib/consulta falhar (o chamador cai no yfinance)."""
+    try:
+        from tradingview_screener import Query, col
+    except Exception:
+        return None
+
+    # Núcleo (técnicos + recomendação) — campos bem estabelecidos.
+    campos_core = [
+        'name', 'close', 'open', 'high', 'low', 'volume', 'change',
+        'Recommend.All', 'Recommend.MA', 'Recommend.Other',
+        'RSI', 'RSI[1]', 'Stoch.K', 'Stoch.D', 'CCI20', 'ADX',
+        'MACD.macd', 'MACD.signal',
+        'SMA20', 'SMA50', 'SMA200', 'EMA20', 'EMA50',
+        'BB.upper', 'BB.lower', 'ATR', 'Volatility.D',
+        'relative_volume_10d_calc', 'average_volume_10d_calc',
+        'market_cap_basic', 'price_earnings_ttm',
+        'sector', 'industry', 'price_52_week_high', 'price_52_week_low',
+    ]
+    # Fundamentais extras (nomes menos garantidos): P/B, EPS e dividend yield.
+    campos_full = campos_core + ['price_book_fq', 'earnings_per_share_basic_ttm', 'dividends_yield']
+
+    df = None
+    for campos in (campos_full, campos_core):
+        try:
+            _, _df = (
+                Query()
+                .select(*campos)
+                .where(col('name') == ticker_us)
+                .set_markets('america')
+                .limit(1)
+                .get_scanner_data()
+            )
+            if _df is not None and not _df.empty:
+                df = _df
+                break
+        except Exception:
+            continue
+    if df is None or df.empty:
+        return None
+
+    r = df.iloc[0]
+    def g(k, casas=None):
+        return _tv_num(r.get(k), casas)
+
+    close = g('close')
+    if close is None:
+        return None
+    change = g('change', 2)
+    prev = close / (1 + change / 100) if (change is not None and change != -100) else close
+    change_abs = _tv_num(close - prev, 2) if prev else None
+
+    macd = g('MACD.macd', 4)
+    macd_sig = g('MACD.signal', 4)
+    macd_hist = _tv_num((macd - macd_sig), 4) if (macd is not None and macd_sig is not None) else None
+
+    rec_all = g('Recommend.All', 3)
+    rec_lbl, rec_cor = _tv_rec_label(rec_all)
+
+    sma20, sma50, sma200 = g('SMA20'), g('SMA50'), g('SMA200')
+    rsi_v, stk_v, cci_v = g('RSI', 1), g('Stoch.K', 1), g('CCI20', 1)
+
+    # Contagem de sinais (mesma lógica do caminho yfinance) para o cartão "SINAIS".
+    buys = sum([
+        1 if (rsi_v is not None and rsi_v < 45) else 0,
+        1 if (close and sma20 and close > sma20) else 0,
+        1 if (close and sma50 and close > sma50) else 0,
+        1 if (close and sma200 and close > sma200) else 0,
+        1 if (macd_hist is not None and macd_hist > 0) else 0,
+        1 if (stk_v is not None and stk_v < 50) else 0,
+        1 if (cci_v is not None and cci_v < 0) else 0,
+    ])
+    sells = sum([
+        1 if (rsi_v is not None and rsi_v > 55) else 0,
+        1 if (close and sma20 and close < sma20) else 0,
+        1 if (close and sma50 and close < sma50) else 0,
+        1 if (close and sma200 and close < sma200) else 0,
+        1 if (macd_hist is not None and macd_hist < 0) else 0,
+        1 if (stk_v is not None and stk_v > 50) else 0,
+        1 if (cci_v is not None and cci_v > 0) else 0,
+    ])
+    neutral = max(0, 7 - buys - sells)
+
+    setor_tv = str(r.get('sector') or '').strip()
+    setor = _TV_SETOR_YAHOO.get(setor_tv, setor_tv)
+
+    return {
+        'erro': None, 'fonte': 'TradingView', 'ticker': ticker_us,
+        'close': g('close', 2), 'open': g('open', 2),
+        'high': g('high', 2), 'low': g('low', 2),
+        'volume': g('volume', 0), 'change_pct': change, 'change_abs': change_abs,
+        'sma20': g('SMA20', 2), 'sma50': g('SMA50', 2), 'sma200': g('SMA200', 2),
+        'ema20': g('EMA20', 2), 'ema50': g('EMA50', 2),
+        'rsi': rsi_v, 'rsi_prev': g('RSI[1]', 1),
+        'macd': macd, 'macd_signal': macd_sig, 'macd_hist': macd_hist,
+        'stoch_k': stk_v, 'stoch_d': g('Stoch.D', 1),
+        'cci': cci_v, 'adx': g('ADX', 1),
+        'bb_upper': g('BB.upper', 2), 'bb_lower': g('BB.lower', 2),
+        'bb_basis': _tv_num((g('BB.upper') + g('BB.lower')) / 2, 2) if (g('BB.upper') is not None and g('BB.lower') is not None) else None,
+        'vol_rel': g('relative_volume_10d_calc', 2), 'vol_avg10': g('average_volume_10d_calc', 0),
+        'rec_val': rec_all, 'rec_label': rec_lbl, 'rec_cor': rec_cor,
+        'rec_ma': g('Recommend.MA', 3), 'rec_outros': g('Recommend.Other', 3),
+        'buys': buys, 'sells': sells, 'neutral': neutral, 'total_sinais': 7,
+        'mktcap': g('market_cap_basic'), 'eps': g('earnings_per_share_basic_ttm', 2),
+        'pe': g('price_earnings_ttm', 1), 'pb': g('price_book_fq', 2),
+        'div_yield': g('dividends_yield', 2),   # TradingView já entrega em %
+        'setor': setor, 'industria': str(r.get('industry') or '').strip(),
+        'atr': g('ATR', 2), 'volatilidade': g('Volatility.D', 2),
+        'max_52s': g('price_52_week_high', 2), 'min_52s': g('price_52_week_low', 2),
+    }
+
 
 @st.cache_data(ttl=300, show_spinner=False)
 def buscar_dados_tradingview(ticker_us, ticker_bdr=''):
     """
-    Busca dados via yfinance e calcula indicadores técnicos completos.
-    Inclui recomendação sintética (compra/venda/neutro) baseada em
-    RSI, MACD, médias móveis, Estocástico e Bollinger Bands —
-    inspirada no sistema de sinais do TradingView Screener.
+    Busca os dados do painel. Tenta primeiro os dados REAIS do TradingView
+    (mercado 'america', incluindo a recomendação oficial Recommend.All) e, se
+    falhar, cai para o yfinance com indicadores calculados localmente.
     """
+    # 1) Dados reais do TradingView
+    _tv = _buscar_tv_screener(ticker_us)
+    if _tv is not None:
+        return _tv
+
+    # 2) Fallback: yfinance + indicadores locais (estilo TradingView)
     try:
         from modules.yf_session import criar_ticker
 
