@@ -365,7 +365,7 @@ BDR_TO_US_MAP = {
     'G1PI34': 'GPN',
     'G1RM34': 'GRMN',
     'G1SK34': 'GSK',
-    'G1TR39': 'G1TR',
+    'G1TR39': 'GLTR',
     'G1WW34': 'GWW',
     'G2DD34': 'GDDY',
     'G2DI33': 'G2D',
