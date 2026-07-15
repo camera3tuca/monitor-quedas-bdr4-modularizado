@@ -28,6 +28,7 @@ from modules.styles import *
 from modules.etf import *
 from modules.etf import eh_etf, buscar_dados_etf
 from modules.flow import renderizar_painel_flow
+from modules.backtest import backtestar_scanner, renderizar_backtest_scanner
 
 st.set_page_config(
     page_title="Monitor BDRs - Swing Trade",
@@ -763,6 +764,27 @@ O gráfico tem **4 painéis** (histórico via Yahoo; escolha o *timeframe* diár
             except Exception:
                 resultado_ts = None
             renderizar_triple_screen(resultado_ts, ticker, row['Empresa'])
+
+            # === BACKTEST DO SINAL DO SCANNER ===
+            # Valida no histórico a MESMA regra que a tabela usa para apontar a
+            # oportunidade. Usa o histórico da BDR; se for curto demais (BDR
+            # ilíquida), cai para o ativo US subjacente, como o gráfico faz.
+            st.markdown("---")
+            try:
+                _hist_bt = obter_historico_ticker(ticker)
+                _hist_bt = _hist_bt.dropna(subset=['Close']) if _hist_bt is not None else pd.DataFrame()
+                if _hist_bt.empty or len(_hist_bt) < 80:
+                    _tk_us_bt = mapear_ticker_us(ticker)
+                    if _tk_us_bt and _tk_us_bt != ticker:
+                        _df_us_bt = obter_historico_us_escalado(_tk_us_bt, row['Preco'])
+                        if _df_us_bt is not None:
+                            _df_us_bt = _df_us_bt.dropna(subset=['Close'])
+                            if len(_df_us_bt) > len(_hist_bt):
+                                _hist_bt = _df_us_bt
+                resultado_bt = backtestar_scanner(_hist_bt)
+            except Exception:
+                resultado_bt = None
+            renderizar_backtest_scanner(resultado_bt, ticker, row['Empresa'])
 
             # === PAINEL FUNDAMENTALISTA (ABAIXO DO GRÁFICO) ===
             st.markdown("---")
