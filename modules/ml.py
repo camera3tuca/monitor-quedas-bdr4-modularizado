@@ -266,12 +266,9 @@ def backtestar_ml(df_ticker, refit_freq=21, custo=0.0005, min_teste=25):
 
 def renderizar_backtest_ml(resultado, ticker, empresa):
     """Card do backtest walk-forward do ML (estilo claro do app)."""
-    st.markdown('<h4 style="margin:0.5rem 0;">🧪 Backtest do Modelo (walk-forward)</h4>',
-                unsafe_allow_html=True)
-
-    with st.expander("ℹ️ Por que este backtest complementa o R²"):
+    with st.expander("🧪 Backtest do Modelo (walk-forward)", expanded=False):
         st.markdown("""
-O **R²** diz se o modelo *ajusta* os dados — não se ele **ganha dinheiro**. Este
+ℹ️ O **R²** diz se o modelo *ajusta* os dados — não se ele **ganha dinheiro**. Este
 backtest responde a pergunta prática: *operar seguindo a previsão diária do
 modelo teria sido lucrativo?*
 
@@ -285,29 +282,29 @@ modelo teria sido lucrativo?*
 > ⚠️ Validação **indicativa** sobre uma janela de teste curta; use junto com o resto.
         """)
 
-    if not resultado or not resultado.get('ok'):
-        motivos = {
-            'dados': 'dados insuficientes/incompletos para o modelo',
-            'teste_curto': 'janela de teste muito curta para um backtest confiável',
-            'treino_falhou': 'o modelo não pôde ser treinado neste ativo',
-            'lib_ausente': 'scikit-learn indisponível no ambiente',
-            'erro': 'não foi possível rodar o backtest agora',
-        }
-        motivo = (resultado or {}).get('motivo', 'erro')
-        st.info(f"🧪 Backtest do modelo indisponível para **{ticker}**: "
-                f"{motivos.get(motivo, motivos['erro'])}.")
-        return
+        if not resultado or not resultado.get('ok'):
+            motivos = {
+                'dados': 'dados insuficientes/incompletos para o modelo',
+                'teste_curto': 'janela de teste muito curta para um backtest confiável',
+                'treino_falhou': 'o modelo não pôde ser treinado neste ativo',
+                'lib_ausente': 'scikit-learn indisponível no ambiente',
+                'erro': 'não foi possível rodar o backtest agora',
+            }
+            motivo = (resultado or {}).get('motivo', 'erro')
+            st.info(f"🧪 Backtest do modelo indisponível para **{ticker}**: "
+                    f"{motivos.get(motivo, motivos['erro'])}.")
+            return
 
-    r = resultado
-    venceu = r['vantagem_pct'] > 0
-    if venceu:
-        bg, borda, cor = '#f0fdf4', '#86efac', '#15803d'
-        icone, veredito = '✅', 'Seguir o modelo superou o Buy & Hold no teste'
-    else:
-        bg, borda, cor = '#fef2f2', '#fca5a5', '#b91c1c'
-        icone, veredito = '⚠️', 'Seguir o modelo NÃO superou o Buy & Hold no teste'
+        r = resultado
+        venceu = r['vantagem_pct'] > 0
+        if venceu:
+            bg, borda, cor = '#f0fdf4', '#86efac', '#15803d'
+            icone, veredito = '✅', 'Seguir o modelo superou o Buy & Hold no teste'
+        else:
+            bg, borda, cor = '#fef2f2', '#fca5a5', '#b91c1c'
+            icone, veredito = '⚠️', 'Seguir o modelo NÃO superou o Buy & Hold no teste'
 
-    st.markdown(f"""
+        st.markdown(f"""
     <div style='background:{bg};border:1px solid {borda};border-left:4px solid {cor};
                 border-radius:12px;padding:0.9rem 1.1rem;margin-bottom:0.9rem;'>
         <div style='display:flex;align-items:center;gap:0.5rem;'>
@@ -321,22 +318,22 @@ modelo teria sido lucrativo?*
     </div>
     """, unsafe_allow_html=True)
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("🎯 Acerto de Direção", f"{r['acuracia_direcional']:.0f}%")
-    c2.metric("📈 Retorno do Modelo", f"{r['retorno_pct']:+.1f}%")
-    c3.metric("🪙 Buy & Hold", f"{r['buyhold_pct']:+.1f}%",
-              delta=f"{r['vantagem_pct']:+.1f} p.p.")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("🎯 Acerto de Direção", f"{r['acuracia_direcional']:.0f}%")
+        c2.metric("📈 Retorno do Modelo", f"{r['retorno_pct']:+.1f}%")
+        c3.metric("🪙 Buy & Hold", f"{r['buyhold_pct']:+.1f}%",
+                  delta=f"{r['vantagem_pct']:+.1f} p.p.")
 
-    c4, c5, c6 = st.columns(3)
-    c4.metric("⚖️ Sharpe", f"{r['sharpe']:.2f}")
-    c5.metric("📉 Max Drawdown", f"{r['max_dd_pct']:.1f}%")
-    c6.metric("⏱️ Tempo Comprado", f"{r['exposure_pct']:.0f}%")
+        c4, c5, c6 = st.columns(3)
+        c4.metric("⚖️ Sharpe", f"{r['sharpe']:.2f}")
+        c5.metric("📉 Max Drawdown", f"{r['max_dd_pct']:.1f}%")
+        c6.metric("⏱️ Tempo Comprado", f"{r['exposure_pct']:.0f}%")
 
-    st.caption(
-        f"Win rate dos dias comprados: {r['win_rate']:.0f}% · "
-        "custo de corretagem simulado: 0,05% por troca de posição. "
-        "Previsão por média do ensemble, retreino a cada ~21 pregões."
-    )
+        st.caption(
+            f"Win rate dos dias comprados: {r['win_rate']:.0f}% · "
+            "custo de corretagem simulado: 0,05% por troca de posição. "
+            "Previsão por média do ensemble, retreino a cada ~21 pregões."
+        )
 
 
 def prever_preco_ml(df_ticker, ticker, dias_previsao=5):
