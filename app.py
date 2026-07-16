@@ -15,7 +15,7 @@ import re
 from modules.news import *
 from modules.news import _limpar_html, _formatar_data, _traduzir_com_mymemory, _parsear_item_rss, _buscar_rss, _buscar_yahoo_rss, _buscar_gurufocus_rss, _buscar_seekingalpha_rss, _buscar_marketwatch_rss, _buscar_google_news_rss, _buscar_finviz, _analisar_sentimento_noticias, _renderizar_card_noticia
 from modules.ml import *
-from modules.ml import _prever_preco_ml_cached
+from modules.ml import _prever_preco_ml_cached, _backtestar_ml_cached, renderizar_backtest_ml
 from modules.rl import *
 from modules.rl import _executar_agente_rl_cached, _sigmoid, _relu, _softmax, _QNetwork, _RLAgent, _get_state_rl
 from modules.tradingview import *
@@ -1050,6 +1050,12 @@ Faixas: **≥80% Excelente · 65–79 Bom · 50–64 Neutro · 35–49 Atenção
             # Usa wrapper cacheado — só re-treina se o ticker mudar
             resultado_ml = _prever_preco_ml_cached(ticker, dias_previsao=5)
             renderizar_painel_ml(resultado_ml, ticker, row['Empresa'], dias_previsao=5)
+
+            # Backtest walk-forward do modelo — valida se seguir a previsão
+            # diária teria dado dinheiro (o que o R² não responde).
+            with st.spinner("Rodando backtest walk-forward do modelo..."):
+                resultado_bt_ml = _backtestar_ml_cached(ticker)
+            renderizar_backtest_ml(resultado_bt_ml, ticker, row['Empresa'])
 
             # === MÓDULO DE REINFORCEMENT LEARNING ===
             resultado_rl = _executar_agente_rl_cached(ticker, episodes=8, window_size=5)
