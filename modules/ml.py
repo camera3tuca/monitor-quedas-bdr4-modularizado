@@ -12,37 +12,331 @@ import xml.etree.ElementTree as ET
 import html as html_lib
 import re
 
+def _preparar_df_ml(ticker):
+    """Baixa 1 ano da BDR e calcula os indicadores que o modelo consome.
+    Compartilhado entre a previsão e o backtest. Retorna DataFrame ou None."""
+    from modules.yf_session import baixar as _yf_baixar
+    df_raw = _yf_baixar(f"{ticker}.SA", period='1y', interval='1d',
+                        auto_adjust=True, progress=False, timeout=30)
+    if df_raw is None or df_raw.empty:
+        return None
+    if isinstance(df_raw.columns, pd.MultiIndex):
+        df_raw.columns = df_raw.columns.get_level_values(0)
+    close = df_raw['Close'].dropna()
+    df_raw['EMA20']    = close.ewm(span=20).mean()
+    df_raw['EMA50']    = close.ewm(span=50).mean()
+    df_raw['EMA200']   = close.ewm(span=200).mean()
+    delta = close.diff()
+    ganho = delta.clip(lower=0).rolling(14).mean()
+    perda = (-delta.clip(upper=0)).rolling(14).mean()
+    df_raw['RSI14']    = 100 - (100 / (1 + ganho / perda.replace(0, float('nan'))))
+    sma20 = close.rolling(20).mean()
+    std20 = close.rolling(20).std()
+    df_raw['BB_Lower'] = sma20 - std20 * 2
+    df_raw['BB_Upper'] = sma20 + std20 * 2
+    ema12 = close.ewm(span=12).mean()
+    ema26 = close.ewm(span=26).mean()
+    macd  = ema12 - ema26
+    df_raw['MACD_Hist'] = macd - macd.ewm(span=9).mean()
+    return df_raw.dropna(subset=['Close'])
+
+
 @st.cache_data(ttl=1800, show_spinner=False)
 def _prever_preco_ml_cached(ticker, dias_previsao=5):
     """Wrapper cacheado para prever_preco_ml — evita re-treino a cada interação."""
     try:
-        from modules.yf_session import baixar as _yf_baixar
-        df_raw = _yf_baixar(f"{ticker}.SA", period='1y', interval='1d',
-                            auto_adjust=True, progress=False, timeout=30)
-        if df_raw is None or df_raw.empty:
+        df = _preparar_df_ml(ticker)
+        if df is None:
             return {'erro': 'Sem dados para o modelo.'}
-        if isinstance(df_raw.columns, pd.MultiIndex):
-            df_raw.columns = df_raw.columns.get_level_values(0)
-        # Calcula indicadores necessários
-        close = df_raw['Close'].dropna()
-        df_raw['EMA20']    = close.ewm(span=20).mean()
-        df_raw['EMA50']    = close.ewm(span=50).mean()
-        df_raw['EMA200']   = close.ewm(span=200).mean()
-        delta = close.diff()
-        ganho = delta.clip(lower=0).rolling(14).mean()
-        perda = (-delta.clip(upper=0)).rolling(14).mean()
-        df_raw['RSI14']    = 100 - (100 / (1 + ganho / perda.replace(0, float('nan'))))
-        sma20 = close.rolling(20).mean()
-        std20 = close.rolling(20).std()
-        df_raw['BB_Lower'] = sma20 - std20 * 2
-        df_raw['BB_Upper'] = sma20 + std20 * 2
-        ema12 = close.ewm(span=12).mean()
-        ema26 = close.ewm(span=26).mean()
-        macd  = ema12 - ema26
-        df_raw['MACD_Hist'] = macd - macd.ewm(span=9).mean()
-        return prever_preco_ml(df_raw.dropna(subset=['Close']), ticker, dias_previsao)
+        return prever_preco_ml(df, ticker, dias_previsao)
     except Exception as e:
         return {'erro': f'Erro no modelo ML: {str(e)}'}
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _backtestar_ml_cached(ticker):
+    """Wrapper cacheado para backtestar_ml — o walk-forward é caro (retreinos),
+    então cacheia por ticker."""
+    try:
+        df = _preparar_df_ml(ticker)
+        if df is None:
+            return {'ok': False, 'motivo': 'dados'}
+        return backtestar_ml(df)
+    except Exception as e:
+        return {'ok': False, 'motivo': 'erro', 'detalhe': str(e)[:120]}
+
+
+def _construir_features_ml(df_ticker):
+    """Feature engineering + target compartilhados entre a previsão (prever_preco_ml)
+    e o backtest walk-forward (backtestar_ml). Manter num só lugar garante que o
+    backtest valide EXATAMENTE as mesmas features que o modelo em produção usa.
+
+    Retorna ``(df, feature_cols)`` em caso de sucesso, ou ``(None, msg_erro)``.
+    """
+    df = df_ticker.copy().sort_index()
+
+    # --- Colunas mínimas necessárias ---
+    for col in ['Close', 'EMA20', 'RSI14']:
+        if col not in df.columns:
+            return None, f'Coluna {col} não encontrada nos dados.'
+
+    df = df.dropna(subset=['Close', 'EMA20', 'RSI14'])
+
+    if len(df) < 80:
+        return None, 'Dados insuficientes para treinar o ensemble (mín. 80 dias).'
+
+    close = df['Close']
+
+    # ── Feature engineering (multi-period returns, inspirado no notebook) ──
+    df['LogRet_1d']  = np.log(close).diff(1)
+    df['LogRet_5d']  = np.log(close).diff(5)
+    df['LogRet_15d'] = np.log(close).diff(15)
+    df['LogRet_30d'] = np.log(close).diff(30)
+
+    df['Volatil_10d'] = df['LogRet_1d'].rolling(10).std()
+    df['Volatil_20d'] = df['LogRet_1d'].rolling(20).std()
+
+    df['EMA_Dist20']  = (close - df['EMA20']) / df['EMA20']
+    if 'EMA50' in df.columns:
+        df['EMA_Dist50'] = (close - df['EMA50']) / df['EMA50']
+    if 'EMA200' in df.columns:
+        df['EMA_Dist200'] = (close - df['EMA200']) / df['EMA200']
+
+    if 'BB_Upper' in df.columns and 'BB_Lower' in df.columns:
+        bw = df['BB_Upper'] - df['BB_Lower']
+        df['BB_pctB'] = (close - df['BB_Lower']) / bw.replace(0, np.nan)
+
+    if 'MACD_Hist' in df.columns:
+        df['MACD_Hist_norm'] = df['MACD_Hist'] / close
+
+    # Target: retorno log do próximo dia
+    df['Target_LogRet'] = df['LogRet_1d'].shift(-1)
+    df = df.dropna()
+
+    feature_cols = [c for c in [
+        'LogRet_1d', 'LogRet_5d', 'LogRet_15d', 'LogRet_30d',
+        'Volatil_10d', 'Volatil_20d',
+        'RSI14', 'EMA_Dist20',
+        'EMA_Dist50', 'EMA_Dist200',
+        'BB_pctB', 'MACD_Hist_norm',
+    ] if c in df.columns]
+
+    return df, feature_cols
+
+
+def _construir_candidatos_ml(n_train):
+    """Constrói o dicionário de modelos candidatos do ensemble, com os mesmos
+    hiperparâmetros usados em produção (dependem do tamanho do treino). Extraído
+    para o backtest walk-forward treinar exatamente o mesmo ensemble."""
+    from sklearn.linear_model import LinearRegression, ElasticNet
+    from sklearn.ensemble import (GradientBoostingRegressor,
+                                  RandomForestRegressor,
+                                  ExtraTreesRegressor)
+    # Menos estimadores + mais regularização + profundidade menor = menos overfitting
+    pequeno = n_train < 150
+    leaf_min = max(3, n_train // 30)
+    return {
+        'GradientBoosting': GradientBoostingRegressor(
+            n_estimators=80 if pequeno else 150,
+            learning_rate=0.08 if pequeno else 0.05,
+            max_depth=2 if pequeno else 3,
+            subsample=0.7,
+            min_samples_leaf=leaf_min,
+            random_state=42),
+        'RandomForest': RandomForestRegressor(
+            n_estimators=100,
+            max_depth=3 if pequeno else 5,
+            min_samples_leaf=leaf_min,
+            max_features='sqrt',
+            random_state=42, n_jobs=-1),
+        'ExtraTrees': ExtraTreesRegressor(
+            n_estimators=100,
+            max_depth=3 if pequeno else 5,
+            min_samples_leaf=leaf_min,
+            max_features='sqrt',
+            random_state=42, n_jobs=-1),
+        'ElasticNet': ElasticNet(
+            alpha=0.01 if pequeno else 0.001,
+            l1_ratio=0.5, max_iter=5000),
+        'LinearRegression': LinearRegression(),
+    }
+
+
+def backtestar_ml(df_ticker, refit_freq=21, custo=0.0005, min_teste=25):
+    """Backtest WALK-FORWARD do sinal do ensemble de ML.
+
+    A pergunta que o R²/RMSE não responde: **operar seguindo a previsão diária
+    do modelo teria dado dinheiro?** Aqui medimos isso, sem vazamento de dados:
+
+    - Janela expansível: em cada dia de teste ``t`` o modelo só enxerga dados
+      até ``t`` (retreino a cada ``refit_freq`` pregões).
+    - Previsão por MÉDIA do ensemble (evita o viés de escolher o "melhor" modelo
+      olhando o próprio teste).
+    - Regra: comprado (long) quando a previsão do próximo dia é positiva; fora do
+      mercado caso contrário. Custo de ``custo`` por troca de posição.
+    - Comparação com Buy & Hold no mesmo período de teste.
+
+    Retorna dict de métricas ou ``{'ok': False, 'motivo': ...}`` — nunca levanta.
+    """
+    try:
+        from sklearn.preprocessing import StandardScaler
+
+        df, feature_cols = _construir_features_ml(df_ticker)
+        if df is None:
+            return {'ok': False, 'motivo': 'dados', 'detalhe': feature_cols}
+
+        X = df[feature_cols].values
+        y = df['Target_LogRet'].values  # log-retorno REALIZADO do próximo dia
+        n = len(X)
+        split = int(n * 0.80)
+        n_teste = n - split
+        if n_teste < min_teste:
+            return {'ok': False, 'motivo': 'teste_curto', 'amostra': n, 'n_teste': n_teste}
+
+        # ── Walk-forward: prevê cada dia do teste out-of-sample ───────────────
+        preds = np.full(n_teste, np.nan)
+        modelos = None
+        scaler = None
+        for j in range(n_teste):
+            t = split + j
+            if j % refit_freq == 0:  # retreino em janela expansível
+                Xtr, ytr = X[:t], y[:t]
+                scaler = StandardScaler()
+                Xtr_sc = scaler.fit_transform(Xtr)
+                modelos = []
+                for mod in _construir_candidatos_ml(t).values():
+                    try:
+                        mod.fit(Xtr_sc, ytr)
+                        modelos.append(mod)
+                    except Exception:
+                        continue
+                if not modelos:
+                    return {'ok': False, 'motivo': 'treino_falhou', 'amostra': n}
+            x_sc = scaler.transform(X[t:t + 1])
+            preds[j] = float(np.mean([m.predict(x_sc)[0] for m in modelos]))
+
+        y_teste = y[split:]                 # log-retornos realizados
+        ret_real = np.exp(y_teste) - 1.0    # retorno simples realizado por dia
+        posicao = (preds > 0).astype(float)  # 1 = comprado, 0 = fora
+
+        # Custo aplicado quando a posição MUDA (entra ou sai do mercado)
+        trocas = np.abs(np.diff(np.concatenate([[0.0], posicao])))
+        n_trades = int(trocas.sum())
+        ret_estrategia = posicao * ret_real - trocas * custo
+
+        equity = np.cumprod(1.0 + ret_estrategia)
+        retorno_pct = (equity[-1] - 1.0) * 100
+        buyhold_pct = (np.prod(1.0 + ret_real) - 1.0) * 100
+
+        # Acurácia direcional: o sinal previsto bateu com o realizado?
+        acertos_dir = np.mean((preds > 0) == (y_teste > 0)) * 100
+        # Win rate dos dias EM QUE ESTEVE comprado
+        dias_long = ret_real[posicao > 0]
+        win_rate = float(np.mean(dias_long > 0) * 100) if len(dias_long) else 0.0
+
+        # Sharpe anualizado da estratégia (dias úteis)
+        sd = ret_estrategia.std()
+        sharpe = float(ret_estrategia.mean() / sd * np.sqrt(252)) if sd > 1e-12 else 0.0
+
+        # Max drawdown da curva de capital
+        pico = np.maximum.accumulate(equity)
+        max_dd = float(((equity - pico) / pico).min() * 100)
+
+        exposure = float(posicao.mean() * 100)
+
+        return {
+            'ok': True,
+            'amostra': n,
+            'n_teste': n_teste,
+            'retorno_pct': float(retorno_pct),
+            'buyhold_pct': float(buyhold_pct),
+            'vantagem_pct': float(retorno_pct - buyhold_pct),
+            'acuracia_direcional': float(acertos_dir),
+            'win_rate': win_rate,
+            'sharpe': sharpe,
+            'max_dd_pct': max_dd,
+            'exposure_pct': exposure,
+            'n_trades': n_trades,
+        }
+    except ImportError:
+        return {'ok': False, 'motivo': 'lib_ausente'}
+    except Exception as e:
+        return {'ok': False, 'motivo': 'erro', 'detalhe': str(e)[:120]}
+
+
+def renderizar_backtest_ml(resultado, ticker, empresa):
+    """Card do backtest walk-forward do ML (estilo claro do app)."""
+    st.markdown('<h4 style="margin:0.5rem 0;">🧪 Backtest do Modelo (walk-forward)</h4>',
+                unsafe_allow_html=True)
+
+    with st.expander("ℹ️ Por que este backtest complementa o R²"):
+        st.markdown("""
+O **R²** diz se o modelo *ajusta* os dados — não se ele **ganha dinheiro**. Este
+backtest responde a pergunta prática: *operar seguindo a previsão diária do
+modelo teria sido lucrativo?*
+
+- **Walk-forward:** a cada pregão o modelo só usa dados do **passado** (retreino
+  periódico) — sem espiar o futuro.
+- **Regra:** comprado quando a previsão do próximo dia é positiva; fora do
+  mercado caso contrário.
+- **Acurácia direcional:** com que frequência o modelo acerta a **direção** (alta/baixa).
+- **Buy & Hold:** a régua — comprar e segurar no mesmo período de teste.
+
+> ⚠️ Validação **indicativa** sobre uma janela de teste curta; use junto com o resto.
+        """)
+
+    if not resultado or not resultado.get('ok'):
+        motivos = {
+            'dados': 'dados insuficientes/incompletos para o modelo',
+            'teste_curto': 'janela de teste muito curta para um backtest confiável',
+            'treino_falhou': 'o modelo não pôde ser treinado neste ativo',
+            'lib_ausente': 'scikit-learn indisponível no ambiente',
+            'erro': 'não foi possível rodar o backtest agora',
+        }
+        motivo = (resultado or {}).get('motivo', 'erro')
+        st.info(f"🧪 Backtest do modelo indisponível para **{ticker}**: "
+                f"{motivos.get(motivo, motivos['erro'])}.")
+        return
+
+    r = resultado
+    venceu = r['vantagem_pct'] > 0
+    if venceu:
+        bg, borda, cor = '#f0fdf4', '#86efac', '#15803d'
+        icone, veredito = '✅', 'Seguir o modelo superou o Buy & Hold no teste'
+    else:
+        bg, borda, cor = '#fef2f2', '#fca5a5', '#b91c1c'
+        icone, veredito = '⚠️', 'Seguir o modelo NÃO superou o Buy & Hold no teste'
+
+    st.markdown(f"""
+    <div style='background:{bg};border:1px solid {borda};border-left:4px solid {cor};
+                border-radius:12px;padding:0.9rem 1.1rem;margin-bottom:0.9rem;'>
+        <div style='display:flex;align-items:center;gap:0.5rem;'>
+            <span style='font-size:1.3rem;'>{icone}</span>
+            <div>
+                <div style='font-weight:800;font-size:0.9rem;color:{cor};'>{veredito}</div>
+                <div style='font-size:0.78rem;color:#64748b;'>
+                    walk-forward em {r['n_teste']} pregões de teste · {r['n_trades']} operações</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("🎯 Acerto de Direção", f"{r['acuracia_direcional']:.0f}%")
+    c2.metric("📈 Retorno do Modelo", f"{r['retorno_pct']:+.1f}%")
+    c3.metric("🪙 Buy & Hold", f"{r['buyhold_pct']:+.1f}%",
+              delta=f"{r['vantagem_pct']:+.1f} p.p.")
+
+    c4, c5, c6 = st.columns(3)
+    c4.metric("⚖️ Sharpe", f"{r['sharpe']:.2f}")
+    c5.metric("📉 Max Drawdown", f"{r['max_dd_pct']:.1f}%")
+    c6.metric("⏱️ Tempo Comprado", f"{r['exposure_pct']:.0f}%")
+
+    st.caption(
+        f"Win rate dos dias comprados: {r['win_rate']:.0f}% · "
+        "custo de corretagem simulado: 0,05% por troca de posição. "
+        "Previsão por média do ensemble, retreino a cada ~21 pregões."
+    )
 
 
 def prever_preco_ml(df_ticker, ticker, dias_previsao=5):
@@ -76,54 +370,9 @@ def prever_preco_ml(df_ticker, ticker, dias_previsao=5):
         from sklearn.metrics import r2_score, mean_squared_error
         import numpy as np
 
-        df = df_ticker.copy().sort_index()
-
-        # --- Colunas mínimas necessárias ---
-        for col in ['Close', 'EMA20', 'RSI14']:
-            if col not in df.columns:
-                return {'erro': f'Coluna {col} não encontrada nos dados.'}
-
-        df = df.dropna(subset=['Close', 'EMA20', 'RSI14'])
-
-        if len(df) < 80:
-            return {'erro': 'Dados insuficientes para treinar o ensemble (mín. 80 dias).'}
-
-        close = df['Close']
-
-        # ── Feature engineering (multi-period returns, inspirado no notebook) ──
-        df = df.copy()
-        df['LogRet_1d']  = np.log(close).diff(1)
-        df['LogRet_5d']  = np.log(close).diff(5)
-        df['LogRet_15d'] = np.log(close).diff(15)
-        df['LogRet_30d'] = np.log(close).diff(30)
-
-        df['Volatil_10d'] = df['LogRet_1d'].rolling(10).std()
-        df['Volatil_20d'] = df['LogRet_1d'].rolling(20).std()
-
-        df['EMA_Dist20']  = (close - df['EMA20']) / df['EMA20']
-        if 'EMA50' in df.columns:
-            df['EMA_Dist50'] = (close - df['EMA50']) / df['EMA50']
-        if 'EMA200' in df.columns:
-            df['EMA_Dist200'] = (close - df['EMA200']) / df['EMA200']
-
-        if 'BB_Upper' in df.columns and 'BB_Lower' in df.columns:
-            bw = df['BB_Upper'] - df['BB_Lower']
-            df['BB_pctB'] = (close - df['BB_Lower']) / bw.replace(0, np.nan)
-
-        if 'MACD_Hist' in df.columns:
-            df['MACD_Hist_norm'] = df['MACD_Hist'] / close
-
-        # Target: retorno log do próximo dia
-        df['Target_LogRet'] = df['LogRet_1d'].shift(-1)
-        df = df.dropna()
-
-        feature_cols = [c for c in [
-            'LogRet_1d', 'LogRet_5d', 'LogRet_15d', 'LogRet_30d',
-            'Volatil_10d', 'Volatil_20d',
-            'RSI14', 'EMA_Dist20',
-            'EMA_Dist50', 'EMA_Dist200',
-            'BB_pctB', 'MACD_Hist_norm',
-        ] if c in df.columns]
+        df, feature_cols = _construir_features_ml(df_ticker)
+        if df is None:
+            return {'erro': feature_cols}  # feature_cols carrega a msg de erro
 
         X = df[feature_cols].values
         y = df['Target_LogRet'].values   # target: log-retorno
@@ -139,35 +388,7 @@ def prever_preco_ml(df_ticker, ticker, dias_previsao=5):
         X_test_sc  = scaler.transform(X_test)
 
         # ── Candidatos: hiperparâmetros ajustados para datasets pequenos (~200 amostras)
-        # Menos estimadores + mais regularização + profundidade menor = menos overfitting
-        pequeno = split < 150
-        leaf_min = max(3, split // 30)
-
-        candidatos = {
-            'GradientBoosting': GradientBoostingRegressor(
-                n_estimators=80 if pequeno else 150,
-                learning_rate=0.08 if pequeno else 0.05,
-                max_depth=2 if pequeno else 3,
-                subsample=0.7,
-                min_samples_leaf=leaf_min,
-                random_state=42),
-            'RandomForest': RandomForestRegressor(
-                n_estimators=100,
-                max_depth=3 if pequeno else 5,
-                min_samples_leaf=leaf_min,
-                max_features='sqrt',
-                random_state=42, n_jobs=-1),
-            'ExtraTrees': ExtraTreesRegressor(
-                n_estimators=100,
-                max_depth=3 if pequeno else 5,
-                min_samples_leaf=leaf_min,
-                max_features='sqrt',
-                random_state=42, n_jobs=-1),
-            'ElasticNet': ElasticNet(
-                alpha=0.01 if pequeno else 0.001,
-                l1_ratio=0.5, max_iter=5000),
-            'LinearRegression': LinearRegression(),
-        }
+        candidatos = _construir_candidatos_ml(split)
 
         # ── Treinar e avaliar cada candidato ─────────────────────────────────────
         resultados_modelos = {}

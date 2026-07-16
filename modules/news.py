@@ -21,6 +21,65 @@ def _limpar_html(texto):
     return texto.strip()
 
 
+# ── Sentimento por manchete (finVADER léxico-financeiro, sem nltk) ────────────
+# Reproduz o método do finVADER: base VADER (pacote vaderSentiment, Python puro)
+# + léxicos financeiros SentiBigNomics e Henry mesclados. Vendorizamos o léxico
+# (modules/fin_lexicon.json) para NÃO depender do pacote finvader, que fixa
+# nltk==3.6.2 e poderia conflitar com o openbb no deploy. O analisador é
+# construído uma única vez (cache) e reaproveitado por manchete.
+import os as _os
+import json as _json_sent
+
+_ANALISADOR_SENT = None
+_SENT_INDISPONIVEL = False
+
+
+def _obter_analisador_sentimento():
+    """Constrói (uma vez) o analisador VADER com o léxico financeiro mesclado.
+    Retorna None se o vaderSentiment não estiver disponível — a UI degrada sem
+    quebrar."""
+    global _ANALISADOR_SENT, _SENT_INDISPONIVEL
+    if _ANALISADOR_SENT is not None:
+        return _ANALISADOR_SENT
+    if _SENT_INDISPONIVEL:
+        return None
+    try:
+        from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+        sia = SentimentIntensityAnalyzer()
+        caminho = _os.path.join(_os.path.dirname(__file__), 'fin_lexicon.json')
+        with open(caminho, 'r', encoding='utf-8') as f:
+            lex = _json_sent.load(f)
+        sia.lexicon.update(lex)  # léxico financeiro sobre a base VADER
+        _ANALISADOR_SENT = sia
+        return sia
+    except Exception:
+        _SENT_INDISPONIVEL = True
+        return None
+
+
+def _sentimento_manchete(texto_en):
+    """Classifica UMA manchete (em inglês — o léxico é em inglês) e devolve um
+    dicionário com rótulo, score, emoji e cor; ou None se indisponível.
+
+    IMPORTANTE: chamar SEMPRE sobre o título original em inglês, antes da
+    tradução para pt-BR (o léxico financeiro é em inglês)."""
+    sia = _obter_analisador_sentimento()
+    if sia is None or not texto_en or not texto_en.strip():
+        return None
+    try:
+        c = sia.polarity_scores(texto_en)['compound']
+    except Exception:
+        return None
+    if c >= 0.05:
+        return {'score': c, 'label': 'Positivo', 'emoji': '🟢',
+                'cor': '#15803d', 'bg': '#dcfce7'}
+    if c <= -0.05:
+        return {'score': c, 'label': 'Negativo', 'emoji': '🔴',
+                'cor': '#b91c1c', 'bg': '#fee2e2'}
+    return {'score': c, 'label': 'Neutro', 'emoji': '⚪',
+            'cor': '#64748b', 'bg': '#e2e8f0'}
+
+
 def _formatar_data(pub_raw):
     """Converte data RSS -> (str formatada dd/mm/aa HH:MM, datetime UTC para ordenação)."""
     formatos = [
@@ -418,6 +477,12 @@ def buscar_noticias_com_traducao(ticker_us, empresa_nome=''):
     if not unicas:
         return []
 
+    # Sentimento por manchete — calculado sobre o título ORIGINAL em inglês,
+    # ANTES da tradução (o léxico financeiro é em inglês). Fica guardado no
+    # dict e sobrevive à sobrescrita do título traduzido.
+    for n in unicas:
+        n['sentimento'] = _sentimento_manchete(n.get('titulo', ''))
+
     # Tradução paralela
     tit_trad = _traduzir_com_mymemory([n['titulo'] for n in unicas])
     for n, t in zip(unicas, tit_trad):
@@ -455,6 +520,17 @@ def _renderizar_card_noticia(noticia):
     bg, cor_fonte, badge_bg, icone = cores.get(fonte, ('#f8fafc', '#475569', '#e2e8f0', '📰'))
     label_fonte = f"{icone} {fonte_real}" if fonte_real and fonte == 'Google News' else f"{icone} {fonte}"
 
+    # Badge de sentimento da manchete (finVADER léxico-financeiro), se disponível.
+    sent = noticia.get('sentimento')
+    sent_html = ""
+    if sent:
+        sent_html = (
+            f"<span style='background:{sent['bg']};color:{sent['cor']};font-size:0.62rem;"
+            f"font-weight:700;padding:0.12rem 0.5rem;border-radius:999px;white-space:nowrap;"
+            f"flex-shrink:0;' title='Sentimento da manchete (score {sent['score']:+.2f})'>"
+            f"{sent['emoji']} {sent['label']}</span>"
+        )
+
     desc_html = (
         f"<p style='margin:0.35rem 0 0;font-size:0.8rem;color:#64748b;"
         f"line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;"
@@ -467,9 +543,12 @@ def _renderizar_card_noticia(noticia):
                 border-radius:10px;padding:0.85rem 1rem;margin-bottom:0.6rem;'>
         <div style='display:flex;justify-content:space-between;
                     align-items:flex-start;gap:0.5rem;margin-bottom:0.25rem;'>
-            <span style='background:{badge_bg};color:{cor_fonte};font-size:0.65rem;
-                         font-weight:700;padding:0.12rem 0.5rem;border-radius:999px;
-                         white-space:nowrap;flex-shrink:0;'>{label_fonte}</span>
+            <div style='display:flex;gap:0.35rem;flex-wrap:wrap;align-items:center;'>
+                <span style='background:{badge_bg};color:{cor_fonte};font-size:0.65rem;
+                             font-weight:700;padding:0.12rem 0.5rem;border-radius:999px;
+                             white-space:nowrap;flex-shrink:0;'>{label_fonte}</span>
+                {sent_html}
+            </div>
             <span style='font-size:0.68rem;color:#94a3b8;white-space:nowrap;'>{data}</span>
         </div>
         <a href="{link}" target="_blank"

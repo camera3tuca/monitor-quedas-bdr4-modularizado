@@ -15,7 +15,7 @@ import re
 from modules.news import *
 from modules.news import _limpar_html, _formatar_data, _traduzir_com_mymemory, _parsear_item_rss, _buscar_rss, _buscar_yahoo_rss, _buscar_gurufocus_rss, _buscar_seekingalpha_rss, _buscar_marketwatch_rss, _buscar_google_news_rss, _buscar_finviz, _analisar_sentimento_noticias, _renderizar_card_noticia
 from modules.ml import *
-from modules.ml import _prever_preco_ml_cached
+from modules.ml import _prever_preco_ml_cached, _backtestar_ml_cached, renderizar_backtest_ml
 from modules.rl import *
 from modules.rl import _executar_agente_rl_cached, _sigmoid, _relu, _softmax, _QNetwork, _RLAgent, _get_state_rl
 from modules.tradingview import *
@@ -28,6 +28,7 @@ from modules.styles import *
 from modules.etf import *
 from modules.etf import eh_etf, buscar_dados_etf
 from modules.flow import renderizar_painel_flow
+from modules.backtest import backtestar_scanner, renderizar_backtest_scanner, backtestar_triple_screen, renderizar_backtest_triple_screen
 
 st.set_page_config(
     page_title="Monitor BDRs - Swing Trade",
@@ -764,6 +765,35 @@ O gráfico tem **4 painéis** (histórico via Yahoo; escolha o *timeframe* diár
                 resultado_ts = None
             renderizar_triple_screen(resultado_ts, ticker, row['Empresa'])
 
+            # === BACKTEST DO SINAL DO SCANNER ===
+            # Valida no histórico a MESMA regra que a tabela usa para apontar a
+            # oportunidade. Usa o histórico da BDR; se for curto demais (BDR
+            # ilíquida), cai para o ativo US subjacente, como o gráfico faz.
+            st.markdown("---")
+            try:
+                _hist_bt = obter_historico_ticker(ticker)
+                _hist_bt = _hist_bt.dropna(subset=['Close']) if _hist_bt is not None else pd.DataFrame()
+                if _hist_bt.empty or len(_hist_bt) < 80:
+                    _tk_us_bt = mapear_ticker_us(ticker)
+                    if _tk_us_bt and _tk_us_bt != ticker:
+                        _df_us_bt = obter_historico_us_escalado(_tk_us_bt, row['Preco'])
+                        if _df_us_bt is not None:
+                            _df_us_bt = _df_us_bt.dropna(subset=['Close'])
+                            if len(_df_us_bt) > len(_hist_bt):
+                                _hist_bt = _df_us_bt
+                resultado_bt = backtestar_scanner(_hist_bt)
+            except Exception:
+                resultado_bt = None
+            renderizar_backtest_scanner(resultado_bt, ticker, row['Empresa'])
+
+            # Backtest do Triple Screen (Elder) — reaproveita o mesmo histórico
+            # já buscado para o backtest do scanner (com fallback US).
+            try:
+                resultado_bt_ts = backtestar_triple_screen(_hist_bt)
+            except Exception:
+                resultado_bt_ts = None
+            renderizar_backtest_triple_screen(resultado_bt_ts, ticker, row['Empresa'])
+
             # === PAINEL FUNDAMENTALISTA (ABAIXO DO GRÁFICO) ===
             st.markdown("---")
             st.markdown('<h3 class="section-header">📊 Análise Fundamentalista</h3>', unsafe_allow_html=True)
@@ -1029,6 +1059,12 @@ Faixas: **≥80% Excelente · 65–79 Bom · 50–64 Neutro · 35–49 Atenção
             resultado_ml = _prever_preco_ml_cached(ticker, dias_previsao=5)
             renderizar_painel_ml(resultado_ml, ticker, row['Empresa'], dias_previsao=5)
 
+            # Backtest walk-forward do modelo — valida se seguir a previsão
+            # diária teria dado dinheiro (o que o R² não responde).
+            with st.spinner("Rodando backtest walk-forward do modelo..."):
+                resultado_bt_ml = _backtestar_ml_cached(ticker)
+            renderizar_backtest_ml(resultado_bt_ml, ticker, row['Empresa'])
+
             # === MÓDULO DE REINFORCEMENT LEARNING ===
             resultado_rl = _executar_agente_rl_cached(ticker, episodes=8, window_size=5)
             renderizar_painel_rl(resultado_rl, ticker, row['Empresa'])
@@ -1112,6 +1148,32 @@ Reúne as notícias dos **últimos 30 dias** da empresa-mãe, de várias fontes 
                         empresa_nome_news, variacao_dia_news)
                 if sentimento_html:
                     st.markdown(sentimento_html, unsafe_allow_html=True)
+
+                # ── Placar de sentimento por manchete (finVADER léxico) ─────────
+                # Complementa a análise da IA: contagem determinística por
+                # manchete, funciona mesmo se a chamada ao Claude falhar.
+                _sents = [n.get('sentimento') for n in noticias_lista if n.get('sentimento')]
+                if _sents:
+                    _pos = sum(1 for s in _sents if s['label'] == 'Positivo')
+                    _neg = sum(1 for s in _sents if s['label'] == 'Negativo')
+                    _neu = len(_sents) - _pos - _neg
+                    _media = sum(s['score'] for s in _sents) / len(_sents)
+                    if _media >= 0.05:
+                        _tom, _tcor = 'predominância positiva', '#15803d'
+                    elif _media <= -0.05:
+                        _tom, _tcor = 'predominância negativa', '#b91c1c'
+                    else:
+                        _tom, _tcor = 'tom neutro/misto', '#64748b'
+                    st.markdown(
+                        f"<div style='display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;"
+                        f"margin:-0.3rem 0 0.6rem;font-size:0.8rem;'>"
+                        f"<span style='font-weight:700;color:#475569;'>Sentimento das manchetes:</span>"
+                        f"<span style='color:#15803d;font-weight:700;'>🟢 {_pos}</span>"
+                        f"<span style='color:#64748b;font-weight:700;'>⚪ {_neu}</span>"
+                        f"<span style='color:#b91c1c;font-weight:700;'>🔴 {_neg}</span>"
+                        f"<span style='color:{_tcor};'>· {_tom} (média {_media:+.2f})</span>"
+                        f"<span style='color:#94a3b8;font-size:0.7rem;'>· léxico financeiro finVADER</span>"
+                        f"</div>", unsafe_allow_html=True)
 
                 # ── Caption de resumo ──────────────────────────────────────────
                 from collections import Counter
