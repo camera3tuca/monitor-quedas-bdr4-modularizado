@@ -153,12 +153,9 @@ def renderizar_backtest_scanner(resultado, ticker, empresa):
     """Renderiza o card de backtest do sinal do scanner (estilo claro do app)."""
     import streamlit as st
 
-    st.markdown('<h3 class="section-header">🔁 Backtest do Sinal (validação histórica)</h3>',
-                unsafe_allow_html=True)
-
-    with st.expander("ℹ️ O que este backtest faz"):
+    with st.expander("🔁 Backtest do Sinal (validação histórica)", expanded=False):
         st.markdown("""
-Pega a **mesma regra** que o scanner usa para apontar oportunidades (compra na
+ℹ️ Pega a **mesma regra** que o scanner usa para apontar oportunidades (compra na
 **correção dentro de tendência de alta** — o sinal que aparece na tabela) e
 aplica-a **para trás**, sobre o histórico de preços do ativo, simulando as
 operações que teriam acontecido.
@@ -172,31 +169,31 @@ operações que teriam acontecido.
 > filtro, junto com o resto da análise.
         """)
 
-    if not resultado or not resultado.get("ok"):
-        motivos = {
-            "historico_curto": "histórico insuficiente para um backtest confiável",
-            "poucos_sinais": "o sinal quase não apareceu neste ativo no período",
-            "sem_trades": "nenhuma operação foi fechada no período",
-            "lib_ausente": "biblioteca de backtest indisponível no ambiente",
-            "erro": "não foi possível rodar o backtest agora",
-        }
-        motivo = (resultado or {}).get("motivo", "erro")
-        amostra = (resultado or {}).get("amostra")
-        extra = f" ({amostra} barras)" if amostra else ""
-        st.info(f"🔁 Backtest indisponível para **{ticker}**: "
-                f"{motivos.get(motivo, motivos['erro'])}{extra}.")
-        return
+        if not resultado or not resultado.get("ok"):
+            motivos = {
+                "historico_curto": "histórico insuficiente para um backtest confiável",
+                "poucos_sinais": "o sinal quase não apareceu neste ativo no período",
+                "sem_trades": "nenhuma operação foi fechada no período",
+                "lib_ausente": "biblioteca de backtest indisponível no ambiente",
+                "erro": "não foi possível rodar o backtest agora",
+            }
+            motivo = (resultado or {}).get("motivo", "erro")
+            amostra = (resultado or {}).get("amostra")
+            extra = f" ({amostra} barras)" if amostra else ""
+            st.info(f"🔁 Backtest indisponível para **{ticker}**: "
+                    f"{motivos.get(motivo, motivos['erro'])}{extra}.")
+            return
 
-    r = resultado
-    venceu = r["vantagem_pct"] > 0
-    if venceu:
-        bg, borda, cor = "#f0fdf4", "#86efac", "#15803d"
-        icone, veredito = "✅", "O sinal superou o Buy & Hold no período"
-    else:
-        bg, borda, cor = "#fef2f2", "#fca5a5", "#b91c1c"
-        icone, veredito = "⚠️", "O sinal NÃO superou o Buy & Hold no período"
+        r = resultado
+        venceu = r["vantagem_pct"] > 0
+        if venceu:
+            bg, borda, cor = "#f0fdf4", "#86efac", "#15803d"
+            icone, veredito = "✅", "O sinal superou o Buy & Hold no período"
+        else:
+            bg, borda, cor = "#fef2f2", "#fca5a5", "#b91c1c"
+            icone, veredito = "⚠️", "O sinal NÃO superou o Buy & Hold no período"
 
-    st.markdown(f"""
+        st.markdown(f"""
     <div style='background:{bg};border:1px solid {borda};border-left:4px solid {cor};
                 border-radius:12px;padding:0.9rem 1.1rem;margin-bottom:0.9rem;'>
         <div style='display:flex;align-items:center;gap:0.5rem;'>
@@ -210,22 +207,22 @@ operações que teriam acontecido.
     </div>
     """, unsafe_allow_html=True)
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("🎯 Taxa de Acerto", f"{r['win_rate']:.0f}%")
-    c2.metric("📈 Retorno do Sinal", f"{r['retorno_pct']:+.1f}%")
-    c3.metric("🪙 Buy & Hold", f"{r['buyhold_pct']:+.1f}%",
-              delta=f"{r['vantagem_pct']:+.1f} p.p.")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("🎯 Taxa de Acerto", f"{r['win_rate']:.0f}%")
+        c2.metric("📈 Retorno do Sinal", f"{r['retorno_pct']:+.1f}%")
+        c3.metric("🪙 Buy & Hold", f"{r['buyhold_pct']:+.1f}%",
+                  delta=f"{r['vantagem_pct']:+.1f} p.p.")
 
-    c4, c5, c6 = st.columns(3)
-    c4.metric("⚖️ Sharpe", f"{r['sharpe']:.2f}")
-    c5.metric("📉 Max Drawdown", f"{r['max_dd_pct']:.1f}%")
-    c6.metric("⏱️ Tempo Exposto", f"{r['exposure_pct']:.0f}%")
+        c4, c5, c6 = st.columns(3)
+        c4.metric("⚖️ Sharpe", f"{r['sharpe']:.2f}")
+        c5.metric("📉 Max Drawdown", f"{r['max_dd_pct']:.1f}%")
+        c6.metric("⏱️ Tempo Exposto", f"{r['exposure_pct']:.0f}%")
 
-    st.caption(
-        f"Por operação — média {r['avg_trade_pct']:+.2f}% · "
-        f"melhor {r['best_trade_pct']:+.2f}% · pior {r['worst_trade_pct']:+.2f}%. "
-        "Custo de corretagem simulado: 0,1% por ordem."
-    )
+        st.caption(
+            f"Por operação — média {r['avg_trade_pct']:+.2f}% · "
+            f"melhor {r['best_trade_pct']:+.2f}% · pior {r['worst_trade_pct']:+.2f}%. "
+            "Custo de corretagem simulado: 0,1% por ordem."
+        )
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -359,12 +356,9 @@ def renderizar_backtest_triple_screen(resultado, ticker, empresa):
     """Card de backtest do Triple Screen (estilo claro do app)."""
     import streamlit as st
 
-    st.markdown('<h4 style="margin:0.5rem 0;">🔁 Backtest do Triple Screen (validação histórica)</h4>',
-                unsafe_allow_html=True)
-
-    with st.expander("ℹ️ O que este backtest faz"):
+    with st.expander("🔁 Backtest do Triple Screen (validação histórica)", expanded=False):
         st.markdown("""
-Aplica **para trás** o setup de **COMPRA** do Triple Screen (1ª Tela em alta +
+ℹ️ Aplica **para trás** o setup de **COMPRA** do Triple Screen (1ª Tela em alta +
 2ª Tela em sobrevenda) sobre o histórico, simulando as operações que teriam
 acontecido.
 
@@ -377,31 +371,31 @@ acontecido.
 > use como mais um filtro, não como promessa.
         """)
 
-    if not resultado or not resultado.get("ok"):
-        motivos = {
-            "historico_curto": "histórico insuficiente (ou sem volume) para um backtest confiável",
-            "poucos_sinais": "o setup de compra quase não apareceu neste ativo no período",
-            "sem_trades": "nenhuma operação foi fechada no período",
-            "lib_ausente": "biblioteca de backtest indisponível no ambiente",
-            "erro": "não foi possível rodar o backtest agora",
-        }
-        motivo = (resultado or {}).get("motivo", "erro")
-        amostra = (resultado or {}).get("amostra")
-        extra = f" ({amostra} barras)" if amostra else ""
-        st.info(f"🔁 Backtest do Triple Screen indisponível para **{ticker}**: "
-                f"{motivos.get(motivo, motivos['erro'])}{extra}.")
-        return
+        if not resultado or not resultado.get("ok"):
+            motivos = {
+                "historico_curto": "histórico insuficiente (ou sem volume) para um backtest confiável",
+                "poucos_sinais": "o setup de compra quase não apareceu neste ativo no período",
+                "sem_trades": "nenhuma operação foi fechada no período",
+                "lib_ausente": "biblioteca de backtest indisponível no ambiente",
+                "erro": "não foi possível rodar o backtest agora",
+            }
+            motivo = (resultado or {}).get("motivo", "erro")
+            amostra = (resultado or {}).get("amostra")
+            extra = f" ({amostra} barras)" if amostra else ""
+            st.info(f"🔁 Backtest do Triple Screen indisponível para **{ticker}**: "
+                    f"{motivos.get(motivo, motivos['erro'])}{extra}.")
+            return
 
-    r = resultado
-    venceu = r["vantagem_pct"] > 0
-    if venceu:
-        bg, borda, cor = "#f0fdf4", "#86efac", "#15803d"
-        icone, veredito = "✅", "O setup superou o Buy & Hold no período"
-    else:
-        bg, borda, cor = "#fef2f2", "#fca5a5", "#b91c1c"
-        icone, veredito = "⚠️", "O setup NÃO superou o Buy & Hold no período"
+        r = resultado
+        venceu = r["vantagem_pct"] > 0
+        if venceu:
+            bg, borda, cor = "#f0fdf4", "#86efac", "#15803d"
+            icone, veredito = "✅", "O setup superou o Buy & Hold no período"
+        else:
+            bg, borda, cor = "#fef2f2", "#fca5a5", "#b91c1c"
+            icone, veredito = "⚠️", "O setup NÃO superou o Buy & Hold no período"
 
-    st.markdown(f"""
+        st.markdown(f"""
     <div style='background:{bg};border:1px solid {borda};border-left:4px solid {cor};
                 border-radius:12px;padding:0.9rem 1.1rem;margin-bottom:0.9rem;'>
         <div style='display:flex;align-items:center;gap:0.5rem;'>
@@ -415,19 +409,19 @@ acontecido.
     </div>
     """, unsafe_allow_html=True)
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("🎯 Taxa de Acerto", f"{r['win_rate']:.0f}%")
-    c2.metric("📈 Retorno do Setup", f"{r['retorno_pct']:+.1f}%")
-    c3.metric("🪙 Buy & Hold", f"{r['buyhold_pct']:+.1f}%",
-              delta=f"{r['vantagem_pct']:+.1f} p.p.")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("🎯 Taxa de Acerto", f"{r['win_rate']:.0f}%")
+        c2.metric("📈 Retorno do Setup", f"{r['retorno_pct']:+.1f}%")
+        c3.metric("🪙 Buy & Hold", f"{r['buyhold_pct']:+.1f}%",
+                  delta=f"{r['vantagem_pct']:+.1f} p.p.")
 
-    c4, c5, c6 = st.columns(3)
-    c4.metric("⚖️ Sharpe", f"{r['sharpe']:.2f}")
-    c5.metric("📉 Max Drawdown", f"{r['max_dd_pct']:.1f}%")
-    c6.metric("⏱️ Tempo Exposto", f"{r['exposure_pct']:.0f}%")
+        c4, c5, c6 = st.columns(3)
+        c4.metric("⚖️ Sharpe", f"{r['sharpe']:.2f}")
+        c5.metric("📉 Max Drawdown", f"{r['max_dd_pct']:.1f}%")
+        c6.metric("⏱️ Tempo Exposto", f"{r['exposure_pct']:.0f}%")
 
-    st.caption(
-        f"Por operação — média {r['avg_trade_pct']:+.2f}% · "
-        f"melhor {r['best_trade_pct']:+.2f}% · pior {r['worst_trade_pct']:+.2f}%. "
-        "Custo de corretagem simulado: 0,1% por ordem."
-    )
+        st.caption(
+            f"Por operação — média {r['avg_trade_pct']:+.2f}% · "
+            f"melhor {r['best_trade_pct']:+.2f}% · pior {r['worst_trade_pct']:+.2f}%. "
+            "Custo de corretagem simulado: 0,1% por ordem."
+        )
