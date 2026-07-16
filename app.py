@@ -340,6 +340,18 @@ Os filtros ajudam a focar em **correções dentro de tendências de alta** (o ob
         help="Filtra BDRs pelo ranking de liquidez 0-10. Quanto maior, menor o risco de gaps e volume baixo."
     )
 
+    # Botão global dos backtests (opt-in) — desligado por padrão para não pesar.
+    # Quando ligado, a BDR selecionada exibe os backtests de validação histórica
+    # (sinal do scanner, Triple Screen e modelo de ML walk-forward).
+    rodar_bt = st.toggle(
+        "🔬 Rodar backtests de validação histórica na BDR selecionada",
+        value=False,
+        key="rodar_bt_global",
+        help="Desligado por padrão para não pesar o carregamento. Ligue para "
+             "validar no histórico o sinal do scanner, o Triple Screen e o "
+             "modelo de ML — recalcula ao abrir cada BDR (pode levar segundos).",
+    )
+
     # Aplicar filtros se algum selecionado
     if filtrar_ema20 or filtrar_ema50 or filtrar_ema200 or filtrar_etf or ranking_min_liq > 0:
         df_res_filtrado = []
@@ -765,23 +777,13 @@ O gráfico tem **4 painéis** (histórico via Yahoo; escolha o *timeframe* diár
                 resultado_ts = None
             renderizar_triple_screen(resultado_ts, ticker, row['Empresa'])
 
-            # === BACKTESTS DE VALIDAÇÃO HISTÓRICA (opt-in) ===
-            # Desligados por padrão: rodar os backtests recalcula os sinais barra
-            # a barra (scanner, Triple Screen) e retreina o ensemble de ML
-            # (walk-forward), o que pesa no carregamento. Só computa quando o
-            # usuário liga este botão. O mesmo estado vale para o backtest do ML,
-            # mais abaixo.
-            st.markdown("---")
-            rodar_bt = st.toggle(
-                "🔬 Rodar backtests de validação histórica",
-                value=False,
-                key=f"rodar_bt_{ticker}",
-                help="Desligado por padrão para não pesar o carregamento. Ligue "
-                     "para validar no histórico o sinal do scanner, o Triple "
-                     "Screen e o modelo de ML (pode levar alguns segundos).",
-            )
-
+            # === BACKTESTS DE VALIDAÇÃO HISTÓRICA (opt-in global) ===
+            # O botão fica junto dos filtros, acima do scanner (rodar_bt). Só
+            # computa quando ligado — evita recalcular os sinais barra a barra
+            # (scanner, Triple Screen) e retreinar o ensemble de ML (walk-forward)
+            # a cada seleção de BDR.
             if rodar_bt:
+                st.markdown("---")
                 # Valida no histórico a MESMA regra que a tabela usa para apontar
                 # a oportunidade. Usa o histórico da BDR; se for curto demais
                 # (BDR ilíquida), cai para o ativo US subjacente, como o gráfico.
