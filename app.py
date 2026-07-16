@@ -765,34 +765,52 @@ O gráfico tem **4 painéis** (histórico via Yahoo; escolha o *timeframe* diár
                 resultado_ts = None
             renderizar_triple_screen(resultado_ts, ticker, row['Empresa'])
 
-            # === BACKTEST DO SINAL DO SCANNER ===
-            # Valida no histórico a MESMA regra que a tabela usa para apontar a
-            # oportunidade. Usa o histórico da BDR; se for curto demais (BDR
-            # ilíquida), cai para o ativo US subjacente, como o gráfico faz.
+            # === BACKTESTS DE VALIDAÇÃO HISTÓRICA (opt-in) ===
+            # Desligados por padrão: rodar os backtests recalcula os sinais barra
+            # a barra (scanner, Triple Screen) e retreina o ensemble de ML
+            # (walk-forward), o que pesa no carregamento. Só computa quando o
+            # usuário liga este botão. O mesmo estado vale para o backtest do ML,
+            # mais abaixo.
             st.markdown("---")
-            try:
-                _hist_bt = obter_historico_ticker(ticker)
-                _hist_bt = _hist_bt.dropna(subset=['Close']) if _hist_bt is not None else pd.DataFrame()
-                if _hist_bt.empty or len(_hist_bt) < 80:
-                    _tk_us_bt = mapear_ticker_us(ticker)
-                    if _tk_us_bt and _tk_us_bt != ticker:
-                        _df_us_bt = obter_historico_us_escalado(_tk_us_bt, row['Preco'])
-                        if _df_us_bt is not None:
-                            _df_us_bt = _df_us_bt.dropna(subset=['Close'])
-                            if len(_df_us_bt) > len(_hist_bt):
-                                _hist_bt = _df_us_bt
-                resultado_bt = backtestar_scanner(_hist_bt)
-            except Exception:
-                resultado_bt = None
-            renderizar_backtest_scanner(resultado_bt, ticker, row['Empresa'])
+            rodar_bt = st.toggle(
+                "🔬 Rodar backtests de validação histórica",
+                value=False,
+                key=f"rodar_bt_{ticker}",
+                help="Desligado por padrão para não pesar o carregamento. Ligue "
+                     "para validar no histórico o sinal do scanner, o Triple "
+                     "Screen e o modelo de ML (pode levar alguns segundos).",
+            )
 
-            # Backtest do Triple Screen (Elder) — reaproveita o mesmo histórico
-            # já buscado para o backtest do scanner (com fallback US).
-            try:
-                resultado_bt_ts = backtestar_triple_screen(_hist_bt)
-            except Exception:
-                resultado_bt_ts = None
-            renderizar_backtest_triple_screen(resultado_bt_ts, ticker, row['Empresa'])
+            if rodar_bt:
+                # Valida no histórico a MESMA regra que a tabela usa para apontar
+                # a oportunidade. Usa o histórico da BDR; se for curto demais
+                # (BDR ilíquida), cai para o ativo US subjacente, como o gráfico.
+                try:
+                    _hist_bt = obter_historico_ticker(ticker)
+                    _hist_bt = _hist_bt.dropna(subset=['Close']) if _hist_bt is not None else pd.DataFrame()
+                    if _hist_bt.empty or len(_hist_bt) < 80:
+                        _tk_us_bt = mapear_ticker_us(ticker)
+                        if _tk_us_bt and _tk_us_bt != ticker:
+                            _df_us_bt = obter_historico_us_escalado(_tk_us_bt, row['Preco'])
+                            if _df_us_bt is not None:
+                                _df_us_bt = _df_us_bt.dropna(subset=['Close'])
+                                if len(_df_us_bt) > len(_hist_bt):
+                                    _hist_bt = _df_us_bt
+                    with st.spinner("Rodando backtest do sinal..."):
+                        resultado_bt = backtestar_scanner(_hist_bt)
+                except Exception:
+                    resultado_bt = None
+                    _hist_bt = None
+                renderizar_backtest_scanner(resultado_bt, ticker, row['Empresa'])
+
+                # Backtest do Triple Screen (Elder) — reaproveita o mesmo histórico.
+                try:
+                    with st.spinner("Rodando backtest do Triple Screen..."):
+                        resultado_bt_ts = (backtestar_triple_screen(_hist_bt)
+                                           if _hist_bt is not None else None)
+                except Exception:
+                    resultado_bt_ts = None
+                renderizar_backtest_triple_screen(resultado_bt_ts, ticker, row['Empresa'])
 
             # === PAINEL FUNDAMENTALISTA (ABAIXO DO GRÁFICO) ===
             st.markdown("---")
@@ -1060,10 +1078,12 @@ Faixas: **≥80% Excelente · 65–79 Bom · 50–64 Neutro · 35–49 Atenção
             renderizar_painel_ml(resultado_ml, ticker, row['Empresa'], dias_previsao=5)
 
             # Backtest walk-forward do modelo — valida se seguir a previsão
-            # diária teria dado dinheiro (o que o R² não responde).
-            with st.spinner("Rodando backtest walk-forward do modelo..."):
-                resultado_bt_ml = _backtestar_ml_cached(ticker)
-            renderizar_backtest_ml(resultado_bt_ml, ticker, row['Empresa'])
+            # diária teria dado dinheiro (o que o R² não responde). Gated pelo
+            # mesmo botão dos demais backtests, para não retreinar sem opt-in.
+            if rodar_bt:
+                with st.spinner("Rodando backtest walk-forward do modelo..."):
+                    resultado_bt_ml = _backtestar_ml_cached(ticker)
+                renderizar_backtest_ml(resultado_bt_ml, ticker, row['Empresa'])
 
             # === MÓDULO DE REINFORCEMENT LEARNING ===
             resultado_rl = _executar_agente_rl_cached(ticker, episodes=8, window_size=5)
