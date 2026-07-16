@@ -1135,6 +1135,32 @@ Reúne as notícias dos **últimos 30 dias** da empresa-mãe, de várias fontes 
                 if sentimento_html:
                     st.markdown(sentimento_html, unsafe_allow_html=True)
 
+                # ── Placar de sentimento por manchete (finVADER léxico) ─────────
+                # Complementa a análise da IA: contagem determinística por
+                # manchete, funciona mesmo se a chamada ao Claude falhar.
+                _sents = [n.get('sentimento') for n in noticias_lista if n.get('sentimento')]
+                if _sents:
+                    _pos = sum(1 for s in _sents if s['label'] == 'Positivo')
+                    _neg = sum(1 for s in _sents if s['label'] == 'Negativo')
+                    _neu = len(_sents) - _pos - _neg
+                    _media = sum(s['score'] for s in _sents) / len(_sents)
+                    if _media >= 0.05:
+                        _tom, _tcor = 'predominância positiva', '#15803d'
+                    elif _media <= -0.05:
+                        _tom, _tcor = 'predominância negativa', '#b91c1c'
+                    else:
+                        _tom, _tcor = 'tom neutro/misto', '#64748b'
+                    st.markdown(
+                        f"<div style='display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;"
+                        f"margin:-0.3rem 0 0.6rem;font-size:0.8rem;'>"
+                        f"<span style='font-weight:700;color:#475569;'>Sentimento das manchetes:</span>"
+                        f"<span style='color:#15803d;font-weight:700;'>🟢 {_pos}</span>"
+                        f"<span style='color:#64748b;font-weight:700;'>⚪ {_neu}</span>"
+                        f"<span style='color:#b91c1c;font-weight:700;'>🔴 {_neg}</span>"
+                        f"<span style='color:{_tcor};'>· {_tom} (média {_media:+.2f})</span>"
+                        f"<span style='color:#94a3b8;font-size:0.7rem;'>· léxico financeiro finVADER</span>"
+                        f"</div>", unsafe_allow_html=True)
+
                 # ── Caption de resumo ──────────────────────────────────────────
                 from collections import Counter
                 contagem_fontes = Counter(n['fonte'] for n in noticias_lista)
