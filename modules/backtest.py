@@ -226,3 +226,208 @@ operações que teriam acontecido.
         f"melhor {r['best_trade_pct']:+.2f}% · pior {r['worst_trade_pct']:+.2f}%. "
         "Custo de corretagem simulado: 0,1% por ordem."
     )
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Backtest da estratégia Triple Screen (Alexander Elder)
+# ════════════════════════════════════════════════════════════════════════════
+
+def _metricas_de_stats(stats, amostra):
+    """Converte o objeto de estatísticas do ``backtesting`` num dict padrão,
+    tratando NaN/ausências. Compartilhado pelos backtests que usam a engine."""
+    def _f(chave, padrao=0.0):
+        v = stats.get(chave, padrao)
+        try:
+            v = float(v)
+            return padrao if np.isnan(v) else v
+        except (TypeError, ValueError):
+            return padrao
+
+    retorno = _f("Return [%]")
+    buyhold = _f("Buy & Hold Return [%]")
+    return {
+        "ok": True,
+        "amostra": amostra,
+        "n_trades": int(stats.get("# Trades", 0)),
+        "win_rate": _f("Win Rate [%]"),
+        "retorno_pct": retorno,
+        "buyhold_pct": buyhold,
+        "vantagem_pct": retorno - buyhold,
+        "sharpe": _f("Sharpe Ratio"),
+        "max_dd_pct": _f("Max. Drawdown [%]"),
+        "exposure_pct": _f("Exposure Time [%]"),
+        "avg_trade_pct": _f("Avg. Trade [%]"),
+        "best_trade_pct": _f("Best Trade [%]"),
+        "worst_trade_pct": _f("Worst Trade [%]"),
+    }
+
+
+def _rodar_engine_saida(bt_df, entrada_arr, sair_arr, max_hold, cash, comissao):
+    """Engine genérica: compra quando ``entrada_arr`` marca (1) e fecha a posição
+    quando ``sair_arr`` marca (1) ou após ``max_hold`` barras."""
+    from backtesting import Backtest, Strategy
+
+    class _EstrategiaSaida(Strategy):
+        def init(self):
+            self._entrada = self.I(lambda: entrada_arr, name="entrada", plot=False)
+            self._sair = self.I(lambda: sair_arr, name="sair", plot=False)
+            self._barra_entrada = 0
+
+        def next(self):
+            i = len(self.data) - 1
+            if not self.position:
+                if self._entrada[-1] > 0:
+                    self.buy()
+                    self._barra_entrada = i
+            else:
+                if self._sair[-1] > 0 or (i - self._barra_entrada) >= max_hold:
+                    self.position.close()
+
+    bt = Backtest(bt_df, _EstrategiaSaida, cash=cash,
+                  commission=comissao, finalize_trades=True)
+    return bt.run()
+
+
+def backtestar_triple_screen(historico_df, max_hold=25, cash=10000.0,
+                             comissao=0.001, min_barras=80):
+    """Backtest do setup de COMPRA do Triple Screen (Elder), reusando
+    ``analisar_triple_screen`` como fonte da verdade.
+
+    - Entrada (por borda): quando o veredicto vira **COMPRA** (1ª Tela ALTA +
+      2ª Tela SOBREVENDA).
+    - Saída: quando a **maré** (1ª Tela) deixa de ser ALTA — Elder: saia quando
+      a tendência dominante muda — ou após ``max_hold`` barras.
+    - A cada barra, o Triple Screen é recalculado só com dados até ali (janela
+      expansível), sem vazamento de futuro.
+    """
+    try:
+        if historico_df is None or len(historico_df) < min_barras:
+            return {"ok": False, "motivo": "historico_curto",
+                    "amostra": 0 if historico_df is None else len(historico_df)}
+
+        from modules.triple_screen import analisar_triple_screen
+
+        df = historico_df.copy()
+        if "Open" not in df.columns:
+            df["Open"] = df["Close"]
+        for _c in ("High", "Low"):
+            if _c not in df.columns:
+                df[_c] = df["Close"]
+        df = df.dropna(subset=["Open", "High", "Low", "Close"])
+        if len(df) < min_barras or "Volume" not in df.columns:
+            return {"ok": False, "motivo": "historico_curto", "amostra": len(df)}
+
+        n = len(df)
+        # Reconstrói o veredicto e a maré (1ª Tela) barra a barra.
+        eh_compra = np.zeros(n, dtype=bool)
+        mare_alta = np.zeros(n, dtype=bool)
+        for i in range(n):
+            if i < 34:  # Triple Screen exige ~30 barras; antes disso não avalia
+                continue
+            try:
+                res = analisar_triple_screen(df.iloc[: i + 1])
+            except Exception:
+                res = None
+            if res:
+                eh_compra[i] = res.get("veredicto") == "COMPRA"
+                mare_alta[i] = res.get("tela1", {}).get("status") == "ALTA"
+
+        # Entrada por BORDA (o setup COMPRA acaba de aparecer).
+        entrada = np.zeros(n, dtype=float)
+        entrada[1:] = (eh_compra[1:] & ~eh_compra[:-1]).astype(float)
+        if entrada.sum() < 3:
+            return {"ok": False, "motivo": "poucos_sinais", "amostra": n}
+
+        # Saída: a maré deixou de ser ALTA.
+        sair = (~mare_alta).astype(float)
+
+        colunas = ["Open", "High", "Low", "Close", "Volume"]
+        bt_df = df[colunas].copy()
+
+        stats = _rodar_engine_saida(bt_df, entrada, sair, max_hold, cash, comissao)
+        metricas = _metricas_de_stats(stats, n)
+        if metricas["n_trades"] == 0:
+            return {"ok": False, "motivo": "sem_trades", "amostra": n}
+        return metricas
+    except ImportError:
+        return {"ok": False, "motivo": "lib_ausente"}
+    except Exception as e:
+        return {"ok": False, "motivo": "erro", "detalhe": str(e)[:120]}
+
+
+def renderizar_backtest_triple_screen(resultado, ticker, empresa):
+    """Card de backtest do Triple Screen (estilo claro do app)."""
+    import streamlit as st
+
+    st.markdown('<h4 style="margin:0.5rem 0;">🔁 Backtest do Triple Screen (validação histórica)</h4>',
+                unsafe_allow_html=True)
+
+    with st.expander("ℹ️ O que este backtest faz"):
+        st.markdown("""
+Aplica **para trás** o setup de **COMPRA** do Triple Screen (1ª Tela em alta +
+2ª Tela em sobrevenda) sobre o histórico, simulando as operações que teriam
+acontecido.
+
+- **Entrada:** quando o veredicto vira *SETUP DE COMPRA*.
+- **Saída:** quando a **maré** (1ª Tela) deixa de ser de alta — o próprio Elder
+  manda sair quando a tendência dominante muda.
+- **Buy & Hold:** a régua de comparação no mesmo período.
+
+> ⚠️ Validação **indicativa**. Amostra de um ativo é estatisticamente fraca —
+> use como mais um filtro, não como promessa.
+        """)
+
+    if not resultado or not resultado.get("ok"):
+        motivos = {
+            "historico_curto": "histórico insuficiente (ou sem volume) para um backtest confiável",
+            "poucos_sinais": "o setup de compra quase não apareceu neste ativo no período",
+            "sem_trades": "nenhuma operação foi fechada no período",
+            "lib_ausente": "biblioteca de backtest indisponível no ambiente",
+            "erro": "não foi possível rodar o backtest agora",
+        }
+        motivo = (resultado or {}).get("motivo", "erro")
+        amostra = (resultado or {}).get("amostra")
+        extra = f" ({amostra} barras)" if amostra else ""
+        st.info(f"🔁 Backtest do Triple Screen indisponível para **{ticker}**: "
+                f"{motivos.get(motivo, motivos['erro'])}{extra}.")
+        return
+
+    r = resultado
+    venceu = r["vantagem_pct"] > 0
+    if venceu:
+        bg, borda, cor = "#f0fdf4", "#86efac", "#15803d"
+        icone, veredito = "✅", "O setup superou o Buy & Hold no período"
+    else:
+        bg, borda, cor = "#fef2f2", "#fca5a5", "#b91c1c"
+        icone, veredito = "⚠️", "O setup NÃO superou o Buy & Hold no período"
+
+    st.markdown(f"""
+    <div style='background:{bg};border:1px solid {borda};border-left:4px solid {cor};
+                border-radius:12px;padding:0.9rem 1.1rem;margin-bottom:0.9rem;'>
+        <div style='display:flex;align-items:center;gap:0.5rem;'>
+            <span style='font-size:1.3rem;'>{icone}</span>
+            <div>
+                <div style='font-weight:800;font-size:0.9rem;color:{cor};'>{veredito}</div>
+                <div style='font-size:0.78rem;color:#64748b;'>
+                    {r['n_trades']} operações simuladas · {r['amostra']} barras de histórico</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("🎯 Taxa de Acerto", f"{r['win_rate']:.0f}%")
+    c2.metric("📈 Retorno do Setup", f"{r['retorno_pct']:+.1f}%")
+    c3.metric("🪙 Buy & Hold", f"{r['buyhold_pct']:+.1f}%",
+              delta=f"{r['vantagem_pct']:+.1f} p.p.")
+
+    c4, c5, c6 = st.columns(3)
+    c4.metric("⚖️ Sharpe", f"{r['sharpe']:.2f}")
+    c5.metric("📉 Max Drawdown", f"{r['max_dd_pct']:.1f}%")
+    c6.metric("⏱️ Tempo Exposto", f"{r['exposure_pct']:.0f}%")
+
+    st.caption(
+        f"Por operação — média {r['avg_trade_pct']:+.2f}% · "
+        f"melhor {r['best_trade_pct']:+.2f}% · pior {r['worst_trade_pct']:+.2f}%. "
+        "Custo de corretagem simulado: 0,1% por ordem."
+    )

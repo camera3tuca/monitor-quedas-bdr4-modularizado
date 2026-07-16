@@ -28,7 +28,7 @@ from modules.styles import *
 from modules.etf import *
 from modules.etf import eh_etf, buscar_dados_etf
 from modules.flow import renderizar_painel_flow
-from modules.backtest import backtestar_scanner, renderizar_backtest_scanner
+from modules.backtest import backtestar_scanner, renderizar_backtest_scanner, backtestar_triple_screen, renderizar_backtest_triple_screen
 
 st.set_page_config(
     page_title="Monitor BDRs - Swing Trade",
@@ -785,6 +785,14 @@ O gráfico tem **4 painéis** (histórico via Yahoo; escolha o *timeframe* diár
             except Exception:
                 resultado_bt = None
             renderizar_backtest_scanner(resultado_bt, ticker, row['Empresa'])
+
+            # Backtest do Triple Screen (Elder) — reaproveita o mesmo histórico
+            # já buscado para o backtest do scanner (com fallback US).
+            try:
+                resultado_bt_ts = backtestar_triple_screen(_hist_bt)
+            except Exception:
+                resultado_bt_ts = None
+            renderizar_backtest_triple_screen(resultado_bt_ts, ticker, row['Empresa'])
 
             # === PAINEL FUNDAMENTALISTA (ABAIXO DO GRÁFICO) ===
             st.markdown("---")
