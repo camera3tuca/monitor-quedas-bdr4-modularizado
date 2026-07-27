@@ -32,8 +32,10 @@ def eh_etf(ticker_bdr):
 # não estiver aqui, o código tenta o mapeamento padrão e, em seguida,
 # busca pelo NOME do fundo via yf.Search como fallback.
 ETF_TICKER_CORRECAO = {
-    'AADA39': 'EZA',     # 21Shares / South Africa ETP (aprox.)
-    'ABGD39': 'AGGY',    # abrdn Gold ETF Trust (aprox. — pode variar)
+    # AADA39 (21Shares Cardano ETP) NÃO tem ETF americano equivalente — o antigo
+    # mapeamento p/ 'EZA' (África do Sul) desenhava o gráfico de outro ativo.
+    # Sem entrada aqui, o app exibe um aviso honesto em vez de um gráfico errado.
+    'ABGD39': 'SGOL',    # abrdn Physical Gold Shares ETF
     'ACWX39': 'ACWX',
     'ARGT39': 'ARGT',
     'BACW39': 'ACWI',
@@ -185,6 +187,19 @@ ETF_TICKER_CORRECAO = {
     'ANGV39': 'ANGL',
     'AXRP39': 'XRP',
 }
+
+
+def mapear_etf_us(ticker_bdr):
+    """Retorna o ticker US real do fundo para uma BDR de ETF, ou None.
+
+    Usa o ETF_TICKER_CORRECAO (mapa curado de ETFs). O gráfico e o backtest
+    consomem isto para o *fallback* US — o mapeamento padrão (mapear_ticker_us)
+    só remove os dígitos e não acha o fundo americano (ex.: BEWY39 -> 'BEWY',
+    que não existe; o correto é 'EWY'). Não usa heurística de sufixo aqui: para
+    ETF, um palpite errado desenha o gráfico de OUTRO fundo — melhor devolver
+    None e o app exibir um aviso claro.
+    """
+    return ETF_TICKER_CORRECAO.get(str(ticker_bdr).strip().upper())
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
