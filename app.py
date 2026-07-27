@@ -26,7 +26,7 @@ from modules.fundamentals import *
 from modules.technical import *
 from modules.styles import *
 from modules.etf import *
-from modules.etf import eh_etf, buscar_dados_etf
+from modules.etf import eh_etf, buscar_dados_etf, mapear_etf_us
 from modules.flow import renderizar_painel_flow
 from modules.backtest import backtestar_scanner, renderizar_backtest_scanner, backtestar_triple_screen, renderizar_backtest_triple_screen
 
@@ -554,7 +554,10 @@ O gráfico tem **4 painéis** (histórico via Yahoo; escolha o *timeframe* diár
                 fonte_grafico_us = None
                 _MIN_BARRAS_GRAF = 40
                 if df_ticker.empty or len(df_ticker) < _MIN_BARRAS_GRAF:
-                    _ticker_us_graf = mapear_ticker_us(ticker)
+                    # Para BDR de ETF, o ticker US vem do mapa curado (mapear_etf_us);
+                    # para ações, do mapa padrão. O strip de dígitos não acha o fundo
+                    # americano (ex.: BEWY39 -> 'BEWY' inexistente; correto é 'EWY').
+                    _ticker_us_graf = mapear_etf_us(ticker) if eh_etf(ticker) else mapear_ticker_us(ticker)
                     if _ticker_us_graf and _ticker_us_graf != ticker:
                         _df_us = obter_historico_us_escalado(_ticker_us_graf, row['Preco'])
                         if _df_us is not None:
@@ -564,7 +567,7 @@ O gráfico tem **4 painéis** (histórico via Yahoo; escolha o *timeframe* diár
                                 fonte_grafico_us = _ticker_us_graf
 
                 if df_ticker.empty:
-                    raise ValueError(f"Sem histórico disponível para {ticker} (Yahoo pode ter bloqueado). Tente novamente em instantes.")
+                    raise ValueError("__SEM_HISTORICO__")
 
                 if fonte_grafico_us:
                     st.caption(f"ℹ️ Sem histórico da BDR na B3 — exibindo o gráfico do ativo subjacente **{fonte_grafico_us}** (EUA), convertido pela cotação atual da BDR. Forma e indicadores são os mesmos; a escala é aproximada.")
@@ -756,7 +759,20 @@ O gráfico tem **4 painéis** (histórico via Yahoo; escolha o *timeframe* diár
                             st.markdown(f"<p style='font-size: 0.82rem; color: #92400e; margin: 0.3rem 0;'>• {explicacao}</p>", unsafe_allow_html=True)
 
             except Exception as e:
-                st.error(f"❌ Erro ao carregar gráfico: {e}")
+                if str(e) == "__SEM_HISTORICO__":
+                    if eh_etf(ticker):
+                        st.info(
+                            f"📊 Gráfico técnico indisponível para a BDR de ETF **{ticker}** — "
+                            "sem histórico na B3 e sem ETF americano equivalente mapeado. "
+                            "Os dados do fundo (composição, patrimônio, taxa) aparecem em "
+                            "**Detalhes da ETF**, logo abaixo.")
+                    else:
+                        st.warning(
+                            f"📊 Sem histórico para **{ticker}** no momento "
+                            "(o Yahoo pode ter bloqueado temporariamente). "
+                            "Tente novamente em instantes.")
+                else:
+                    st.error(f"❌ Erro ao carregar gráfico: {e}")
 
             # === PAINEL DETALHADO DE ETF (se aplicável) ===
             if eh_etf(ticker):
@@ -791,7 +807,7 @@ O gráfico tem **4 painéis** (histórico via Yahoo; escolha o *timeframe* diár
                     _hist_bt = obter_historico_ticker(ticker)
                     _hist_bt = _hist_bt.dropna(subset=['Close']) if _hist_bt is not None else pd.DataFrame()
                     if _hist_bt.empty or len(_hist_bt) < 80:
-                        _tk_us_bt = mapear_ticker_us(ticker)
+                        _tk_us_bt = mapear_etf_us(ticker) if eh_etf(ticker) else mapear_ticker_us(ticker)
                         if _tk_us_bt and _tk_us_bt != ticker:
                             _df_us_bt = obter_historico_us_escalado(_tk_us_bt, row['Preco'])
                             if _df_us_bt is not None:
