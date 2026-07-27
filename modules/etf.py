@@ -46,12 +46,12 @@ ETF_TICKER_CORRECAO = {
     'BASK39': 'BASK',
     'BBJP39': 'BBJP',
     'BBUG39': 'BUG',
-    'BCAT39': 'SPCX',
+    'BCAT39': 'CATH',    # Global X S&P 500 Catholic Values (era 'SPCX', ETF de SPAC)
     'BCHI39': 'MCHI',
     'BCIR39': 'CIBR',
     'BCLO39': 'CLOU',
     'BCNY39': 'CNYA',
-    'BCOM39': 'COMB',
+    'BCOM39': 'COMT',    # iShares GSCI Commodity Dynamic Roll (era 'COMB', outro emissor)
     'BCPX39': 'COPX',
     'BCTE39': 'CTEC',
     'BCWV39': 'ACWV',
@@ -66,7 +66,7 @@ ETF_TICKER_CORRECAO = {
     'BEGU39': 'ESGU',
     'BEIS39': 'EIS',
     'BEMV39': 'EEMV',
-    'BEPP39': 'IPAC',
+    'BEPP39': 'EPP',     # iShares MSCI Pacific ex Japan (era 'IPAC', que INCLUI Japão)
     'BEPU39': 'EPU',
     'BEWA39': 'EWA',
     'BEWC39': 'EWC',
@@ -134,7 +134,7 @@ ETF_TICKER_CORRECAO = {
     'BIYW39': 'IYW',
     'BIYZ39': 'IYZ',
     'BJQU39': 'JQUA',
-    'BKCH39': 'BLOK',
+    'BKCH39': 'BKCH',    # Global X Blockchain (era 'BLOK', outro emissor/fundo)
     'BKWB39': 'KWEB',
     'BKXI39': 'KXI',
     'BLBT39': 'LIT',
@@ -169,7 +169,7 @@ ETF_TICKER_CORRECAO = {
     'BUTL39': 'IDU',
     'CRYP39': 'BLOK',
     'DOLL39': 'BIL',
-    'DTCR39': 'IDGT',
+    'DTCR39': 'DTCR',    # Global X Data Center REITs & Digital Infra (era 'IDGT')
     'EIDO39': 'EIDO',
     'EPHE39': 'EPHE',
     'ETHA39': 'ETHA',
@@ -180,7 +180,9 @@ ETF_TICKER_CORRECAO = {
     'SIVR39': 'SIVR',
     'SLXB39': 'SLX',
     'SMIN39': 'SMIN',
-    'SOLN39': 'SGOL',
+    # SOLN39 (21Shares Solana ETP) NÃO tem ETF americano equivalente — estava
+    # mapeado p/ 'SGOL' (OURO!), que desenhava o gráfico do ativo errado.
+    # Sem entrada, o app mostra o aviso honesto em vez de um gráfico incorreto.
     'TBIL39': 'BIL',
     'TOPB39': 'OEF',
     'AETH39': 'ETHA',
