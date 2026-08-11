@@ -867,6 +867,91 @@ def mapear_ticker_us(ticker_bdr):
     return stripped
 
 
+def _ticker_us_tem_dados(tk):
+    """Retorna True/False se o ticker US tem histórico no Yahoo, ou None se a
+    checagem falhou (rate-limit/rede) — nesse caso NÃO forçamos o auto-heal,
+    para não trocar um ticker correto por engano numa falha transitória."""
+    if not tk:
+        return False
+    try:
+        from modules.yf_session import baixar as _yf_baixar
+        df = _yf_baixar(tk, period='5d', progress=False, timeout=15)
+        if df is None:
+            return None
+        return not df.empty
+    except Exception:
+        return None
+
+
+def _tokens_nome(texto):
+    """Palavras significativas (>=4 letras) de uma razão social, sem sufixos
+    corporativos — para casar o nome da empresa com o resultado da busca."""
+    limpo = re.sub(
+        r'\b(ADR|ADS|Sponsored|Unsponsored|Shares?|Class|Ltd|Limited|Inc|'
+        r'Corp|Corporation|Company|Co|PLC|S\.?A\.?|N\.?V\.?|AG|SE|Oyj|ASA|'
+        r'Holdings?|Group|Incorporated|The|and)\b\.?',
+        ' ', str(texto), flags=re.IGNORECASE)
+    return {w.lower() for w in re.findall(r'[A-Za-z]{4,}', limpo)}
+
+
+def _buscar_ticker_us_por_nome(nome_empresa):
+    """Auto-heal: descobre o ticker US pela razão social via yf.Search.
+
+    SEGURANÇA: só aceita ações (EQUITY) listadas nos EUA cujo nome no Yahoo
+    **casa** com a razão social do BDR (ao menos uma palavra significativa em
+    comum). Assim, mesmo num soluço transitório do Yahoo, nunca troca o ticker
+    por uma empresa DIFERENTE. Retorna o símbolo ou None."""
+    if not nome_empresa or nome_empresa == '?':
+        return None
+    tokens_alvo = _tokens_nome(nome_empresa)
+    if not tokens_alvo:
+        return None
+    try:
+        nome = re.sub(
+            r'\b(ADR|ADS|Sponsored|Unsponsored|Shares?|Class|Ltd|Limited|Inc|'
+            r'Corp|Corporation|Company|Co|PLC|S\.?A\.?|N\.?V\.?|AG|SE|Oyj|ASA|'
+            r'Holdings?|Group|Incorporated)\b\.?',
+            '', nome_empresa, flags=re.IGNORECASE).strip().strip(',').strip()
+        if not nome or len(nome) < 3:
+            nome = nome_empresa
+        res = yf.Search(nome, max_results=10)
+        quotes = getattr(res, 'quotes', []) or []
+        _bolsas_us = {'NYQ', 'NMS', 'NGM', 'NCM', 'ASE', 'PCX', 'BATS', 'NYSE',
+                      'NASDAQ', 'PNK'}
+        for q in quotes:
+            sym = (q.get('symbol') or '').strip()
+            tipo = (q.get('quoteType') or '').upper()
+            exch = (q.get('exchange') or '').upper()
+            nome_q = f"{q.get('shortname','')} {q.get('longname','')}"
+            if (tipo == 'EQUITY' and sym and '.' not in sym
+                    and (exch in _bolsas_us or not exch)
+                    and tokens_alvo & _tokens_nome(nome_q)):   # nome tem que casar
+                return sym
+        return None
+    except Exception:
+        return None
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def resolver_ticker_us(ticker_bdr):
+    """Ticker US da BDR **com auto-heal**: usa o mapa curado (mapear_ticker_us);
+    se o ticker mapeado não tiver dados no Yahoo, procura pelo NOME da empresa
+    (yf.Search) e valida. Cacheado por ticker (1 execução por BDR).
+
+    É a rede de segurança para qualquer mapeamento residual errado — troca o
+    ticker apenas quando o mapeado está **comprovadamente sem dados** e a busca
+    por nome achou uma alternativa **com** dados; caso contrário mantém o mapa.
+    """
+    base = mapear_ticker_us(ticker_bdr)
+    tem = _ticker_us_tem_dados(base)
+    if tem is True or tem is None:
+        return base  # tem dados, ou checagem incerta → não arrisca
+    alt = _buscar_ticker_us_por_nome(NOMES_BDRS.get(ticker_bdr, ''))
+    if alt and alt != base and _ticker_us_tem_dados(alt) is True:
+        return alt
+    return base
+
+
 def _dividend_yield_frac(info):
     """Dividend yield como FRAÇÃO (0.04 = 4%), robusto à unidade do yfinance.
 
@@ -2110,7 +2195,7 @@ def buscar_dados_fundamentalistas(ticker_bdr):
     3. OpenBB / FMP — empresa mãe via API alternativa
     4. BRAPI básico — último recurso (preço e volume apenas)
     """
-    ticker_us = mapear_ticker_us(ticker_bdr)
+    ticker_us = resolver_ticker_us(ticker_bdr)
 
     def _score_from_yf_info(info, fonte_label, ticker_label):
         """Processa info do yFinance e devolve dict padronizado ou None."""
