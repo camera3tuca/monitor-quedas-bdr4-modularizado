@@ -746,8 +746,54 @@ def obter_historico_ticker(ticker, periodo=PERIODO):
         return None
 
 
+def _escalar_para_bdr(df, preco_bdr, queda_dia_pct=None):
+    """Escala os preços (já convertidos p/ BRL) para casar com a cotação ATUAL
+    da BDR. Retorna o próprio ``df`` modificado.
+
+    Com ``queda_dia_pct`` (variação % do dia da BDR na B3): ancora a PENÚLTIMA
+    barra no fechamento anterior real da BDR (= preço_atual ÷ (1+queda/100)) e
+    crava a ÚLTIMA barra no preço atual — assim o último movimento do gráfico é
+    a queda REAL da BDR, não a variação do ativo US (que pode não ter caído
+    igual). Sem ele, usa escala constante (última barra = preço atual)."""
+    precos = ['Open', 'High', 'Low', 'Close']
+    try:
+        if (queda_dia_pct is not None and len(df) >= 2
+                and abs(float(queda_dia_pct)) > 0.01):
+            preco_bdr = float(preco_bdr)
+            prev_close_bdr = preco_bdr / (1.0 + float(queda_dia_pct) / 100.0)
+            base = float(df['Close'].iloc[-2])
+            if base > 0 and prev_close_bdr > 0:
+                ratio = prev_close_bdr / base
+                for c in precos:
+                    if c in df.columns:
+                        df[c] = df[c] * ratio
+                # Última barra = variação real do dia da BDR.
+                ult = df.index[-1]
+                if 'Open' in df.columns:
+                    df.loc[ult, 'Open'] = prev_close_bdr
+                df.loc[ult, 'Close'] = preco_bdr
+                if 'High' in df.columns:
+                    df.loc[ult, 'High'] = max(prev_close_bdr, preco_bdr)
+                if 'Low' in df.columns:
+                    df.loc[ult, 'Low'] = min(prev_close_bdr, preco_bdr)
+                return df
+    except (TypeError, ValueError, ZeroDivisionError, IndexError):
+        pass
+
+    # Fallback: escala constante (última barra = preço atual da BDR).
+    try:
+        ratio = float(preco_bdr) / float(df['Close'].iloc[-1])
+    except (TypeError, ValueError, ZeroDivisionError, IndexError):
+        ratio = 1.0
+    if ratio and ratio > 0 and ratio != 1.0:
+        for c in precos:
+            if c in df.columns:
+                df[c] = df[c] * ratio
+    return df
+
+
 @st.cache_data(ttl=900, show_spinner=False)
-def obter_historico_us_escalado(ticker_us, preco_bdr, periodo=PERIODO):
+def obter_historico_us_escalado(ticker_us, preco_bdr, periodo=PERIODO, queda_dia_pct=None):
     """Fallback do gráfico: histórico do ATIVO US subjacente, com os preços
     escalados para a cotação atual da BDR.
 
@@ -759,6 +805,10 @@ def obter_historico_us_escalado(ticker_us, preco_bdr, periodo=PERIODO):
     pelo **câmbio histórico USD/BRL** (o BDR ≈ preço_US × câmbio), e só então
     escala para casar com a cotação ATUAL da BDR. Se o câmbio histórico não
     estiver disponível, cai para uma escala constante (câmbio de hoje).
+
+    ``queda_dia_pct`` (variação % do dia da BDR na B3): quando informado, a
+    ÚLTIMA barra passa a refletir a variação REAL do dia da BDR — senão o
+    gráfico do ativo US (que pode não ter caído igual) mascara a queda da BDR.
     Retorna DataFrame ou ``None``.
     """
     try:
@@ -790,16 +840,9 @@ def obter_historico_us_escalado(ticker_us, preco_bdr, periodo=PERIODO):
         except Exception:
             pass
 
-        # 2) Escala final para casar com a cotação ATUAL da BDR (absorve a razão
-        #    de conversão do BDR e qualquer resíduo).
-        try:
-            ratio = float(preco_bdr) / float(df['Close'].iloc[-1])
-        except (TypeError, ValueError, ZeroDivisionError):
-            ratio = 1.0
-        if ratio and ratio > 0 and ratio != 1.0:
-            for c in precos:
-                if c in df.columns:
-                    df[c] = df[c] * ratio
+        # 2) Escala final para casar com a cotação ATUAL da BDR (e, quando
+        #    possível, refletir a variação real do dia na última barra).
+        df = _escalar_para_bdr(df, preco_bdr, queda_dia_pct)
 
         return _indicadores_basicos(df)   # indicadores sobre os preços já convertidos
     except Exception:
