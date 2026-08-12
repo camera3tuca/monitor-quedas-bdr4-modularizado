@@ -17,7 +17,7 @@ from modules.news import _limpar_html, _formatar_data, _traduzir_com_mymemory, _
 from modules.ml import *
 from modules.ml import _prever_preco_ml_cached, _backtestar_ml_cached, renderizar_backtest_ml
 from modules.rl import *
-from modules.rl import _executar_agente_rl_cached, _sigmoid, _relu, _softmax, _QNetwork, _RLAgent, _get_state_rl
+from modules.rl import _executar_agente_rl_cached, _sigmoid, _relu, _QNetwork, _RLAgent, _get_state_rl
 from modules.tradingview import *
 from modules.minervini import *
 from modules.minervini import _calcular_minervini_cached, _buscar_ibov

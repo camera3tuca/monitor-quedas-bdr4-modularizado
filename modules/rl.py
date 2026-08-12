@@ -3,16 +3,8 @@ from collections import deque
 import streamlit as st
 import pandas as pd
 import numpy as np
-import yfinance as yf
 import matplotlib.pyplot as plt
-import seaborn as sns
-import requests
-from datetime import datetime
-import pytz
-import warnings
-import xml.etree.ElementTree as ET
-import html as html_lib
-import re
+
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _executar_agente_rl_cached(ticker, episodes=8, window_size=5):
@@ -39,11 +31,6 @@ def _sigmoid(x):
 
 def _relu(x):
     return np.maximum(0, x)
-
-
-def _softmax(x):
-    e = np.exp(x - x.max())
-    return e / e.sum()
 
 
 class _QNetwork:
@@ -316,9 +303,9 @@ def renderizar_painel_rl(resultado_rl, ticker, empresa):
                 ℹ️ <strong style='color:#334155;'>Como funciona:</strong>
                 O agente observa as <em>diferenças de preço</em> numa janela deslizante (estado),
                 decide entre <strong>Comprar, Vender ou Aguardar</strong> (ação) e recebe como recompensa
-                o <strong>PnL realizado</strong> em cada venda. Uma rede neural MLP (64→32 neurônios, ReLU)
+                o <strong>PnL realizado</strong> em cada venda. Uma rede neural MLP (32→16 neurônios, ReLU)
                 aproxima a função Q(s,a) — o valor esperado de cada ação em cada estado.
-                O treinamento usa <strong>Experience Replay</strong> (buffer de 500 transações, mini-batch de 32)
+                O treinamento usa <strong>Experience Replay</strong> (buffer de 1000 transações, mini-batch de 32)
                 e política <strong>ε-greedy</strong> com decaimento progressivo do ε.
                 <br><br>
                 ⚠️ <strong style='color:#b45309;'>Aviso:</strong>
@@ -484,9 +471,9 @@ def renderizar_painel_rl(resultado_rl, ticker, empresa):
         st.markdown("""
         <div style='margin-top:0.6rem;padding:0.8rem 1rem;background:#f1f5f9;
                     border-radius:8px;font-size:0.76rem;color:#64748b;line-height:1.7;'>
-            🧠 <strong>Arquitetura DQN:</strong> MLP 3 camadas (64→32→3 neurônios) · Ativação ReLU · Xavier init
-            &nbsp;|&nbsp; 🔄 <strong>Experience Replay:</strong> buffer=500, batch=32
-            &nbsp;|&nbsp; 📉 <strong>ε-greedy:</strong> ε=1.0 → 0.05 (decay=0.99)
+            🧠 <strong>Arquitetura DQN:</strong> MLP 3 camadas (entrada→32→16→3 neurônios) · Ativação ReLU · He init
+            &nbsp;|&nbsp; 🔄 <strong>Experience Replay:</strong> buffer=1000, batch=32
+            &nbsp;|&nbsp; 📉 <strong>ε-greedy:</strong> ε=1.0 → 0.01 (decay=0.995)
             &nbsp;|&nbsp; 🎯 <strong>γ (desconto):</strong> 0.95
             &nbsp;|&nbsp; 📊 <strong>Recompensa:</strong> PnL realizado na venda
         </div>""", unsafe_allow_html=True)
