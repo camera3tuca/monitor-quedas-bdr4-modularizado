@@ -1,16 +1,6 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-import yfinance as yf
 import matplotlib.pyplot as plt
-import seaborn as sns
-import requests
-from datetime import datetime
-import pytz
-import warnings
-import xml.etree.ElementTree as ET
-import html as html_lib
-import re
+
 
 def analisar_triple_screen(df_ticker):
     """
