@@ -13,7 +13,7 @@ import html as html_lib
 import re
 
 from modules.news import *
-from modules.news import _limpar_html, _formatar_data, _traduzir_com_mymemory, _parsear_item_rss, _buscar_rss, _buscar_yahoo_rss, _buscar_gurufocus_rss, _buscar_seekingalpha_rss, _buscar_marketwatch_rss, _buscar_google_news_rss, _buscar_finviz, _analisar_sentimento_noticias, _renderizar_card_noticia
+from modules.news import _limpar_html, _formatar_data, _traduzir_com_mymemory, _parsear_item_rss, _buscar_rss, _buscar_yahoo_rss, _buscar_gurufocus_rss, _buscar_seekingalpha_rss, _buscar_marketwatch_rss, _buscar_google_news_rss, _buscar_finviz, _renderizar_card_noticia
 from modules.ml import *
 from modules.ml import _prever_preco_ml_cached, _backtestar_ml_cached, renderizar_backtest_ml
 from modules.rl import *
@@ -1153,17 +1153,11 @@ Reúne as notícias dos **últimos 30 dias** da empresa-mãe, de várias fontes 
                 or ticker_us_news
             )
             setor_news        = ''
-            variacao_dia_news = None
             if fund_data:
                 nome_fund = fund_data.get('nome', '') or ''
                 if nome_fund and len(nome_fund) > 3:
                     empresa_nome_news = nome_fund
                 setor_news = fund_data.get('setor', '') or ''
-            # Pega variação do dia se disponível na linha da tabela
-            try:
-                variacao_dia_news = float(row.get('Queda_Dia', 0) or 0)
-            except Exception:
-                variacao_dia_news = None
 
             # Cabeçalho com info + botão atualizar
             hc1, hc2 = st.columns([4, 1])
@@ -1181,17 +1175,8 @@ Reúne as notícias dos **últimos 30 dias** da empresa-mãe, de várias fontes 
                 noticias_lista = buscar_noticias_com_traducao(ticker_us_news, empresa_nome_news)
 
             if noticias_lista:
-                # ── Análise de sentimento via Claude AI ───────────────────────
-                with st.spinner("Analisando sentimento das notícias..."):
-                    sentimento_html = _analisar_sentimento_noticias(
-                        noticias_lista, ticker_us_news,
-                        empresa_nome_news, variacao_dia_news)
-                if sentimento_html:
-                    st.markdown(sentimento_html, unsafe_allow_html=True)
-
                 # ── Placar de sentimento por manchete (finVADER léxico) ─────────
-                # Complementa a análise da IA: contagem determinística por
-                # manchete, funciona mesmo se a chamada ao Claude falhar.
+                # Sentimento determinístico por manchete (grátis, sem API).
                 _sents = [n.get('sentimento') for n in noticias_lista if n.get('sentimento')]
                 if _sents:
                     _pos = sum(1 for s in _sents if s['label'] == 'Positivo')

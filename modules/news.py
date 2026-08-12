@@ -1,13 +1,6 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-import yfinance as yf
-import matplotlib.pyplot as plt
-import seaborn as sns
 import requests
 from datetime import datetime
-import pytz
-import warnings
 import xml.etree.ElementTree as ET
 import html as html_lib
 import re
@@ -261,98 +254,6 @@ def _buscar_finviz(ticker_us, max_noticias=5):
     except Exception:
         pass
     return noticias
-
-
-def _analisar_sentimento_noticias(noticias, ticker_us, empresa_nome, variacao_dia=None):
-    """Chama Claude API para análise de sentimento e resumo executivo das notícias."""
-    if not noticias:
-        return None
-    try:
-        import json as _json
-        titulos_e_desc = "\n".join(
-            f"- [{n['data']}] {n['titulo']}"
-            + (f": {n['descricao'][:150]}" if n.get('descricao') else "")
-            for n in noticias[:10])
-        variacao_txt = f"(variação recente: {variacao_dia:+.2f}%)" if variacao_dia else ""
-        prompt = (
-            f"Você é analista financeiro especializado em BDRs e ações americanas.\n\n"
-            f"Analise as notícias recentes sobre {empresa_nome} (ticker: {ticker_us}) {variacao_txt}:\n\n"
-            f"{titulos_e_desc}\n\n"
-            f'Responda APENAS com JSON válido sem texto fora, neste formato exato:\n'
-            f'{{"sentimento":"POSITIVO|NEGATIVO|NEUTRO|MISTO","score":número -10 a 10,'
-            f'"resumo":"2-3 frases em pt-BR sobre os temas e impacto no preço",'
-            f'"fatores_alta":["fator1","fator2"],"fatores_baixa":["fator1","fator2"],'
-            f'"palavras_chave":["p1","p2","p3"]}}'
-        )
-        resp = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={"Content-Type": "application/json"},
-            json={"model": "claude-sonnet-4-20250514", "max_tokens": 600,
-                  "messages": [{"role": "user", "content": prompt}]},
-            timeout=20)
-        if resp.status_code != 200:
-            return None
-        texto = resp.json()['content'][0]['text'].strip()
-        m = re.search(r'\{.*\}', texto, re.DOTALL)
-        if not m:
-            return None
-        dados      = _json.loads(m.group())
-        sentimento = dados.get('sentimento', 'NEUTRO')
-        score      = float(dados.get('score', 0))
-        resumo     = dados.get('resumo', '')
-        fat_alta   = dados.get('fatores_alta', [])
-        fat_baixa  = dados.get('fatores_baixa', [])
-        palavras   = dados.get('palavras_chave', [])
-        cfg = {
-            'POSITIVO': ('#f0fdf4','#15803d','#dcfce7','📈','Sentimento Positivo'),
-            'NEGATIVO': ('#fef2f2','#b91c1c','#fecaca','📉','Sentimento Negativo'),
-            'NEUTRO'  : ('#f8fafc','#475569','#e2e8f0','➡️','Sentimento Neutro'),
-            'MISTO'   : ('#fffbeb','#b45309','#fef3c7','⚖️','Sentimento Misto'),
-        }
-        bg, cor, badge, icone, label = cfg.get(sentimento, cfg['NEUTRO'])
-        score_pct   = int((score + 10) / 20 * 100)
-        cor_bar     = '#16a34a' if score > 2 else '#dc2626' if score < -2 else '#94a3b8'
-        fat_alta_li = ''.join(f"<li>{f}</li>" for f in fat_alta[:3]) or '<li>—</li>'
-        fat_baixa_li= ''.join(f"<li>{f}</li>" for f in fat_baixa[:3]) or '<li>—</li>'
-        tags_html   = ' '.join(
-            f"<span style='background:#e0e7ff;color:#3730a3;padding:0.1rem 0.4rem;"
-            f"border-radius:999px;font-size:0.7rem;font-weight:600;'>{p}</span>"
-            for p in palavras[:6])
-        return f"""
-        <div style='background:{bg};border:1px solid {badge};border-left:4px solid {cor};
-                    border-radius:12px;padding:1rem 1.1rem;margin-bottom:1rem;'>
-            <div style='display:flex;align-items:center;gap:0.6rem;margin-bottom:0.5rem;'>
-                <span style='font-size:1.3rem;'>{icone}</span>
-                <div style='flex:1;'>
-                    <div style='font-weight:800;font-size:0.88rem;color:{cor};'>{label}</div>
-                    <div style='background:#e2e8f0;border-radius:99px;height:5px;margin-top:0.2rem;'>
-                        <div style='background:{cor_bar};width:{score_pct}%;height:5px;
-                                    border-radius:99px;'></div></div>
-                </div>
-                <span style='font-size:0.78rem;font-weight:800;color:{cor};'>{score:+.1f}/10</span>
-            </div>
-            <p style='margin:0 0 0.6rem;font-size:0.84rem;color:#1e293b;line-height:1.55;'>
-                🧠 <strong>Análise IA:</strong> {resumo}</p>
-            <div style='display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.6rem;'>
-                <div style='background:#f0fdf4;border-radius:8px;padding:0.5rem 0.65rem;'>
-                    <div style='font-size:0.65rem;font-weight:700;color:#15803d;margin-bottom:0.25rem;'>
-                        📈 Fatores de Alta</div>
-                    <ul style='margin:0;padding-left:1rem;font-size:0.74rem;
-                                color:#166534;line-height:1.5;'>{fat_alta_li}</ul>
-                </div>
-                <div style='background:#fef2f2;border-radius:8px;padding:0.5rem 0.65rem;'>
-                    <div style='font-size:0.65rem;font-weight:700;color:#b91c1c;margin-bottom:0.25rem;'>
-                        📉 Fatores de Baixa</div>
-                    <ul style='margin:0;padding-left:1rem;font-size:0.74rem;
-                                color:#991b1b;line-height:1.5;'>{fat_baixa_li}</ul>
-                </div>
-            </div>
-            {f"<div style='margin-bottom:0.4rem;'>{tags_html}</div>" if tags_html else ""}
-            <div style='font-size:0.63rem;color:#94a3b8;'>
-                ⚡ Análise gerada por Claude AI · {len(noticias[:10])} notícias recentes</div>
-        </div>"""
-    except Exception:
-        return None
 
 
 @st.cache_data(ttl=900, show_spinner=False)
