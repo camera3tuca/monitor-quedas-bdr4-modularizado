@@ -3,9 +3,10 @@
 Centraliza, num único lugar, a estratégia para evitar o erro
 ``YFRateLimitError: Too Many Requests`` do Yahoo Finance:
 
-  * Uma sessão HTTP única com impersonação de navegador via ``curl_cffi``
-    (forma recomendada pelo yfinance para não ser bloqueado), reaproveitada
-    por todos os módulos.
+  * Uma sessão HTTP com impersonação de navegador via ``curl_cffi`` (forma
+    recomendada pelo yfinance para não ser bloqueado), criada **uma por thread**
+    (thread-local) — sessões do curl_cffi não são thread-safe e o app faz
+    downloads em paralelo.
   * Um wrapper ``baixar()`` em volta de ``yf.download`` com retry e backoff
     exponencial + jitter especificamente nos erros de rate limit.
 
@@ -16,28 +17,33 @@ comportamento padrão sem quebrar.
 
 import time
 import random
+import threading
 
 import yfinance as yf
 
-# Sentinela: None = ainda não inicializado; False = sem sessão custom disponível.
-_session = None
+# Sessão por thread: sessões do curl_cffi não são thread-safe, então cada
+# thread (ThreadPoolExecutor das notícias, threads internas do yf.download...)
+# recebe a sua. Valor por thread: None = não inicializado; um Session = ok;
+# False = curl_cffi indisponível (usar comportamento padrão do yfinance).
+_local = threading.local()
 
 
 def get_session():
-    """Retorna (e memoiza) uma sessão curl_cffi com impersonação de navegador.
+    """Retorna (e memoiza por thread) uma sessão curl_cffi com impersonação.
 
     Retorna ``False`` se ``curl_cffi`` não estiver disponível, sinalizando que
     os downloads devem usar o comportamento padrão do yfinance.
     """
-    global _session
-    if _session is not None:
-        return _session
+    sess = getattr(_local, 'session', None)
+    if sess is not None:
+        return sess
     try:
         from curl_cffi import requests as cffi_requests
-        _session = cffi_requests.Session(impersonate="chrome")
+        sess = cffi_requests.Session(impersonate="chrome")
     except Exception:
-        _session = False
-    return _session
+        sess = False
+    _local.session = sess
+    return sess
 
 
 def criar_ticker(symbol):
@@ -46,7 +52,11 @@ def criar_ticker(symbol):
     if sess:
         try:
             return yf.Ticker(symbol, session=sess)
-        except TypeError:
+        except TypeError as exc:
+            # Só cai no fallback se o erro for sobre o parâmetro `session=`;
+            # outros TypeError (kwarg inválido) devem subir.
+            if 'session' not in str(exc):
+                raise
             return yf.Ticker(symbol)
     return yf.Ticker(symbol)
 
@@ -69,8 +79,11 @@ def _download_once(tickers, **kwargs):
     if sess:
         try:
             return yf.download(tickers, session=sess, **kwargs)
-        except TypeError:
+        except TypeError as exc:
             # Versão do yfinance que não aceita `session=` (usa curl_cffi interno).
+            # Outros TypeError (kwarg inválido) devem subir, não ser mascarados.
+            if 'session' not in str(exc):
+                raise
             return yf.download(tickers, **kwargs)
     return yf.download(tickers, **kwargs)
 
@@ -87,12 +100,10 @@ def baixar(tickers, *, max_tentativas=4, base_sleep=2.0, **kwargs):
     """
     import pandas as pd
 
-    ultima_exc = None
     for tentativa in range(max_tentativas):
         try:
             return _download_once(tickers, **kwargs)
         except Exception as exc:  # noqa: BLE001
-            ultima_exc = exc
             if not _eh_rate_limit(exc) or tentativa == max_tentativas - 1:
                 if _eh_rate_limit(exc):
                     return pd.DataFrame()
@@ -100,6 +111,5 @@ def baixar(tickers, *, max_tentativas=4, base_sleep=2.0, **kwargs):
             # Backoff exponencial com jitter: 2s, 4s, 8s (+/- aleatório).
             espera = base_sleep * (2 ** tentativa) + random.uniform(0, 1)
             time.sleep(espera)
-    if ultima_exc is not None and _eh_rate_limit(ultima_exc):
-        return pd.DataFrame()
+    # Só alcançável se max_tentativas <= 0 (o loop sempre retorna ou levanta).
     return pd.DataFrame()
