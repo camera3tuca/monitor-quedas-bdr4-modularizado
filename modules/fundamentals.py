@@ -67,7 +67,7 @@ BDR_TO_US_MAP = {
     'ARNC34': 'HWM',
     'ASML34': 'ASML',
     'ATTB34': 'T',
-    'AURA33': 'ORA',
+    'AURA33': 'AUGO',
     'AVGO34': 'AVGO',
     'AWII34': 'AWI',
     'AXPB34': 'AXP',
@@ -199,19 +199,19 @@ BDR_TO_US_MAP = {
     'BKNG34': 'BKNG',
     'BKWB39': 'BKWB',
     'BKXI39': 'BKXI',
-    'BLAK34': 'BLAK',
+    'BLAK34': 'BLK',
     'BLBT39': 'LIT',
     'BLPX39': 'BLPX',
     'BLQD39': 'BLQD',
     'BMTU39': 'BMTU',
-    'BMYB34': 'BMYB',
+    'BMYB34': 'BMY',
     'BNDA39': 'BNDA',
     'BOAC34': 'BAC',
     'BOEF39': 'BOEF',
     'BOEI34': 'BA',
     'BONY34': 'BK',
     'BOTZ39': 'BOTZ',
-    'BOXP34': 'BOXP',
+    'BOXP34': 'BXP',
     'BPIC39': 'BPIC',
     'BPVE39': 'BPVE',
     'BQQW39': 'BQQW',
@@ -260,33 +260,33 @@ BDR_TO_US_MAP = {
     'C2GN34': 'CGNX',
     'C2HD34': 'CHDN',
     'C2OI34': 'COIN',
-    'C2OL34': 'CIBR',
+    'C2OL34': 'CIB',
     'C2OU34': 'COUR',
     'C2RN34': 'CRNC',
     'C2RS34': 'CRSP',
     'C2RW34': 'CRWD',
     'C2ZR34': 'CZR',
-    'CAON34': 'CAON',
+    'CAON34': 'COF',
     'CATP34': 'CAT',
     'CHCM34': 'CHTR',
-    'CHDC34': 'CHDC',
+    'CHDC34': 'CHD',
     'CHME34': 'CME',
     'CHVX34': 'CVX',
     'CLOV34': 'CLOV',
-    'CLXC34': 'CLXC',
-    'CNIC34': 'CNIC',
+    'CLXC34': 'CLX',
+    'CNIC34': 'CNI',
     'COCA34': 'KO',
     'COLG34': 'CL',
-    'COPH34': 'COPH',
+    'COPH34': 'COP',
     'COTY34': 'COTY',
     'COWC34': 'COST',
-    'CPRL34': 'CPRL',
-    'CRIN34': 'CRIN',
+    'CPRL34': 'CP',
+    'CRIN34': 'CRI',
     'CSCO34': 'CSCO',
-    'CSXC34': 'CSXC',
+    'CSXC34': 'CSX',
     'CTGP34': 'C',
     'CTSH34': 'CTSH',
-    'CVSH34': 'CVSH',
+    'CVSH34': 'CVS',
     'D1DG34': 'DDOG',
     'D1EX34': 'DXCM',
     'D1LR34': 'DLR',
@@ -299,18 +299,18 @@ BDR_TO_US_MAP = {
     'D2OC34': 'DOCS',
     'D2OX34': 'DOX',
     'D2PZ34': 'DPZ',
-    'DBAG34': 'DBAG',
-    'DDNB34': 'DDNB',
+    'DBAG34': 'DB',
+    'DDNB34': 'DD',
     'DEEC34': 'DE',
     'DEFT31': 'DEFT',
-    'DEOP34': 'DEOP',
-    'DGCO34': 'DGCO',
+    'DEOP34': 'DEO',
+    'DGCO34': 'DG',
     'DHER34': 'DHR',
     'DISB34': 'DIS',
     'DOLL39': 'DOLL',
     'DTCR39': 'DTCR',
     'DUOL34': 'DUOL',
-    'DVAI34': 'DVAI',
+    'DVAI34': 'DVA',
     'E1CO34': 'EC',
     'E1DU34': 'EDU',
     'E1LV34': 'ELV',
@@ -326,18 +326,18 @@ BDR_TO_US_MAP = {
     'E2NP34': 'ENPH',
     'E2ST34': 'ESTC',
     'E2TS34': 'ETSY',
-    'EAIN34': 'EAIN',
+    'EAIN34': 'EA',
     'EBAY34': 'EBAY',
     'EIDO39': 'EIDO',
-    'ELCI34': 'ELCI',
+    'ELCI34': 'EL',
     'EPHE39': 'EPHE',
     'EQIX34': 'EQIX',
     'ETHA39': 'ETHA',
-    'EVEB31': 'EVEB',
+    'EVEB31': 'EVEX',
     'EVTC31': 'EVTC',
     'EWJV39': 'EWJV',
-    'EXGR34': 'EXGR',
-    'EXPB31': 'EXPB',
+    'EXGR34': 'EXPE',
+    'EXPB31': 'EXPGY',
     'EXXO34': 'XOM',
     'F1AN34': 'FANG',
     'F1IS34': 'FI',
@@ -349,11 +349,11 @@ BDR_TO_US_MAP = {
     'F2IV34': 'FIVN',
     'F2NV34': 'FNV',
     'F2RS34': 'FRSH',
-    'FASL34': 'FASL',
+    'FASL34': 'FAST',
     'FBOK34': 'META',
-    'FCXO34': 'FCXO',
+    'FCXO34': 'FCX',
     'FDMO34': 'F',
-    'FDXB34': 'FDXB',
+    'FDXB34': 'FDX',
     'FSLR34': 'FSLR',
     'G1AM34': 'GLPI',
     'G1AR34': 'IT',
@@ -370,17 +370,17 @@ BDR_TO_US_MAP = {
     'G2DD34': 'GDDY',
     'G2DI33': 'G2D',
     'G2EV34': 'GEV',
-    'GDBR34': 'GDBR',
+    'GDBR34': 'GD',
     'GDXB39': 'GDXB',
-    'GEOO34': 'GEOO',
+    'GEOO34': 'GE',
     'GILD34': 'GILD',
     'GMCO34': 'GM',
     'GOGL34': 'GOOGL',
     'GOGL35': 'GOOG',
     'GPRK34': 'GPRK',
     'GPRO34': 'GPRO',
-    'GPSI34': 'GPSI',
-    'GROP31': 'GROP',
+    'GPSI34': 'GAP',
+    'GROP31': 'GRO',
     'GSGI34': 'GS',
     'H1AS34': 'HAS',
     'H1CA34': 'HCA',
@@ -393,10 +393,10 @@ BDR_TO_US_MAP = {
     'H1UM34': 'HUM',
     'H2TA34': 'HR',
     'H2UB34': 'HUBS',
-    'HALI34': 'HALI',
+    'HALI34': 'HAL',
     'HOME34': 'HD',
-    'HOND34': 'HOND',
-    'HPQB34': 'HPQB',
+    'HOND34': 'HMC',
+    'HPQB34': 'HPQ',
     'HYEM39': 'HYEM',
     'I1AC34': 'IAC',
     'I1DX34': 'IDXX',
@@ -421,7 +421,7 @@ BDR_TO_US_MAP = {
     'ITLC34': 'INTC',
     'J1EG34': 'J',
     'J2BL34': 'JBL',
-    'JBSS32': 'JBSS',
+    'JBSS32': 'JBS',
     'JDCO34': 'JD',
     'JNJB34': 'JNJ',
     'JPMC34': 'JPM',
@@ -432,9 +432,9 @@ BDR_TO_US_MAP = {
     'K1SS34': 'KSS',
     'K1TC34': 'KT',
     'K2CG34': 'KC',
-    'KHCB34': 'KHCB',
-    'KMBB34': 'KMBB',
-    'KMIC34': 'KMIC',
+    'KHCB34': 'KHC',
+    'KMBB34': 'KMB',
+    'KMIC34': 'KMI',
     'L1EG34': 'LEG',
     'L1EN34': 'LEN',
     'L1HX34': 'LHX',
@@ -446,9 +446,9 @@ BDR_TO_US_MAP = {
     'L1YV34': 'LYV',
     'L2PL34': 'LPLA',
     'L2SC34': 'LSCC',
-    'LBRD34': 'LBRD',
-    'LILY34': 'LILY',
-    'LOWC34': 'LOWC',
+    'LBRD34': 'LBRDK',
+    'LILY34': 'LLY',
+    'LOWC34': 'LOW',
     'M1AA34': 'MAA',
     'M1CH34': 'MCHP',
     'M1CK34': 'MCK',
@@ -468,16 +468,16 @@ BDR_TO_US_MAP = {
     'M2PR34': 'MPWR',
     'M2RV34': 'MRVL',
     'M2ST34': 'MSTR',
-    'MACY34': 'MACY',
+    'MACY34': 'M',
     'MCDC34': 'MCD',
-    'MCOR34': 'MCOR',
+    'MCOR34': 'MCO',
     'MDLZ34': 'MDLZ',
     'MDTC34': 'MDT',
     'MELI34': 'MELI',
-    'MKLC34': 'MKLC',
+    'MKLC34': 'MKL',
     'MMMC34': 'MMM',
-    'MOOO34': 'MOOO',
-    'MOSC34': 'MOSC',
+    'MOOO34': 'MO',
+    'MOSC34': 'MOS',
     'MRCK34': 'MRK',
     'MSBR34': 'MS',
     'MSCD34': 'MA',
@@ -501,13 +501,13 @@ BDR_TO_US_MAP = {
     'N2LY34': 'NLY',
     'N2TN34': 'NTNX',
     'N2VC34': 'NVCR',
-    'NETE34': 'NETE',
+    'NETE34': 'NTES',
     'NEXT34': 'NEE',
     'NFLX34': 'NFLX',
     'NIKE34': 'NKE',
-    'NMRH34': 'NMRH',
-    'NOCG34': 'NOCG',
-    'NOKI34': 'NOKI',
+    'NMRH34': 'NMR',
+    'NOCG34': 'NOC',
+    'NOKI34': 'NOK',
     'NVDC34': 'NVDA',
     'O1DF34': 'ODFL',
     'O1KT34': 'OKTA',
@@ -515,7 +515,7 @@ BDR_TO_US_MAP = {
     'O2NS34': 'ON',
     'ORCL34': 'ORCL',
     'ORLY34': 'ORLY',
-    'OXYP34': 'OXYP',
+    'OXYP34': 'OXY',
     'P1AC34': 'PCAR',
     'P1AY34': 'PAYX',
     'P1DD34': 'PDD',
@@ -540,10 +540,10 @@ BDR_TO_US_MAP = {
     'PEPB34': 'PEP',
     'PFIZ34': 'PFE',
     'PGCO34': 'PG',
-    'PHGN34': 'PHGN',
-    'PHMO34': 'PHMO',
-    'PNCS34': 'PNCS',
-    'PRXB31': 'PRXB',
+    'PHGN34': 'PHG',
+    'PHMO34': 'PM',
+    'PNCS34': 'PNC',
+    'PRXB31': 'PROSY',
     'PSKY34': 'PSKY',
     'PYPL34': 'PYPL',
     'Q2SC34': 'QS',
@@ -564,12 +564,12 @@ BDR_TO_US_MAP = {
     'R2PD34': 'RPD',
     'REGN34': 'REGN',
     'RGTI34': 'RGTI',
-    'RIGG34': 'RIGG',
-    'RIOT34': 'RIOT',
+    'RIGG34': 'RIG',
+    'RIOT34': 'RIO',
     'ROST34': 'ROST',
     'ROXO34': 'NU',
     'RSSL39': 'RSSL',
-    'RYTT34': 'RYTT',
+    'RYTT34': 'RTX',
     'S1BA34': 'SBAC',
     'S1BS34': 'SBSW',
     'S1HW34': 'SHW',
@@ -594,20 +594,20 @@ BDR_TO_US_MAP = {
     'S2TA34': 'STAG',
     'S2UI34': 'SUI',
     'S2YN34': 'SYNA',
-    'SAPP34': 'SAPP',
-    'SBUB34': 'SBUB',
+    'SAPP34': 'SAP',
+    'SBUB34': 'SBUX',
     'SCHW34': 'SCHW',
     'SIVR39': 'SIVR',
-    'SLBG34': 'SLBG',
+    'SLBG34': 'SLB',
     'SLXB39': 'SLXB',
     'SMIN39': 'SMIN',
-    'SNEC34': 'SNEC',
+    'SNEC34': 'SONY',
     'SOLN39': 'SOLN',
     'SPGI34': 'SPGI',
     'SSFO34': 'CRM',
-    'STMN34': 'STMN',
-    'STOC34': 'STOC',
-    'STZB34': 'STZB',
+    'STMN34': 'STM',
+    'STOC34': 'STNE',
+    'STZB34': 'STZ',
     'T1AL34': 'TAL',
     'T1AM34': 'TEAM',
     'T1EV34': 'TEVA',
@@ -624,17 +624,17 @@ BDR_TO_US_MAP = {
     'T2RM34': 'TRMB',
     'T2TD34': 'TTD',
     'T2YL34': 'TYL',
-    'TAKP34': 'TAKP',
+    'TAKP34': 'TAK',
     'TBIL39': 'TBIL',
-    'TMCO34': 'TMCO',
+    'TMCO34': 'TM',
     'TMOS34': 'TMO',
     'TOPB39': 'TOPB',
-    'TPRY34': 'TPRY',
-    'TRVC34': 'TRVC',
+    'TPRY34': 'TPR',
+    'TRVC34': 'TRV',
     'TSLA34': 'TSLA',
-    'TSMC34': 'TSMC',
-    'TSNF34': 'TSNF',
-    'TXSA34': 'TXSA',
+    'TSMC34': 'TSM',
+    'TSNF34': 'TSN',
+    'TXSA34': 'TX',
     'U1AI34': 'UA',
     'U1AL34': 'UAL',
     'U1BE34': 'UBER',
@@ -645,11 +645,11 @@ BDR_TO_US_MAP = {
     'U2PW34': 'UPWK',
     'U2ST34': 'U',
     'U2TH34': 'UTHR',
-    'UBSG34': 'UBSG',
-    'ULEV34': 'ULEV',
+    'UBSG34': 'UBS',
+    'ULEV34': 'UL',
     'UNHH34': 'UNH',
-    'UPAC34': 'UPAC',
-    'USBC34': 'USBC',
+    'UPAC34': 'UNP',
+    'USBC34': 'USB',
     'V1MC34': 'VMC',
     'V1NO34': 'VNO',
     'V1OD34': 'VOD',
@@ -662,7 +662,7 @@ BDR_TO_US_MAP = {
     'V2TX34': 'VTEX',
     'VERZ34': 'VZ',
     'VISA34': 'V',
-    'VLOE34': 'VLOE',
+    'VLOE34': 'VLO',
     'VRSN34': 'VRSN',
     'W1BD34': 'WBD',
     'W1BO34': 'WB',
@@ -675,14 +675,14 @@ BDR_TO_US_MAP = {
     'W1YC34': 'WY',
     'W2ST34': 'WST',
     'W2YF34': 'W',
-    'WABC34': 'WABC',
+    'WABC34': 'WAL',
     'WALM34': 'WMT',
     'WFCO34': 'WFC',
     'WUNI34': 'WU',
-    'X1YZ34': 'SQ',
-    'XPBR31': 'XPBR',
+    'X1YZ34': 'XYZ',
+    'XPBR31': 'XP',
     'Y2PF34': 'YPF',
-    'YUMR34': 'YUMR',
+    'YUMR34': 'YUM',
     'Z1BR34': 'ZBRA',
     'Z1OM34': 'ZM',
     'Z1TA34': 'ZETA',
@@ -723,7 +723,7 @@ BDR_TO_US_MAP = {
     'B1DX34': 'BDX',
     'B1GN34': 'ONC',
     'B1KR34': 'BKR',
-    'B1ME34': 'BONE',
+    'B1ME34': 'ONC',
     'CFLT34': 'CFLT',
     'HOOD34': 'HOOD',
     'MNDB34': 'MDB',
@@ -760,7 +760,7 @@ BDR_TO_US_MAP = {
     'CME34': 'CME',
     'ATVI34': 'ATVI',
     'FIS34': 'FIS',
-    'FISV34': 'FISV',
+    'FISV34': 'FI',
     'VRTX34': 'VRTX',
     'CCI34': 'CCI',
     'ICE34': 'ICE',
@@ -769,7 +769,7 @@ BDR_TO_US_MAP = {
     'D34': 'D',
     'CI34': 'CI',
     'HUM34': 'HUM',
-    'ANTM34': 'ANTM',
+    'ANTM34': 'ELV',
     'AON34': 'AON',
     'MMC34': 'MMC',
     'PGR34': 'PGR',
@@ -840,7 +840,7 @@ BDR_TO_US_MAP = {
     'PFG34': 'PFG',
     'CINF34': 'CINF',
     'LNC34': 'LNC',
-    'RE34': 'RE',
+    'RE34': 'EG',
     'WRB34': 'WRB',
     'GL34': 'GL',
     'BRO34': 'BRO',
@@ -865,6 +865,91 @@ def mapear_ticker_us(ticker_bdr):
     stripped = ticker_bdr.rstrip('0123456789')
     # Se sobrar dígito no meio, retorna o BDR original (OpenBB pode resolver pelo nome)
     return stripped
+
+
+def _ticker_us_tem_dados(tk):
+    """Retorna True/False se o ticker US tem histórico no Yahoo, ou None se a
+    checagem falhou (rate-limit/rede) — nesse caso NÃO forçamos o auto-heal,
+    para não trocar um ticker correto por engano numa falha transitória."""
+    if not tk:
+        return False
+    try:
+        from modules.yf_session import baixar as _yf_baixar
+        df = _yf_baixar(tk, period='5d', progress=False, timeout=15)
+        if df is None:
+            return None
+        return not df.empty
+    except Exception:
+        return None
+
+
+def _tokens_nome(texto):
+    """Palavras significativas (>=4 letras) de uma razão social, sem sufixos
+    corporativos — para casar o nome da empresa com o resultado da busca."""
+    limpo = re.sub(
+        r'\b(ADR|ADS|Sponsored|Unsponsored|Shares?|Class|Ltd|Limited|Inc|'
+        r'Corp|Corporation|Company|Co|PLC|S\.?A\.?|N\.?V\.?|AG|SE|Oyj|ASA|'
+        r'Holdings?|Group|Incorporated|The|and)\b\.?',
+        ' ', str(texto), flags=re.IGNORECASE)
+    return {w.lower() for w in re.findall(r'[A-Za-z]{4,}', limpo)}
+
+
+def _buscar_ticker_us_por_nome(nome_empresa):
+    """Auto-heal: descobre o ticker US pela razão social via yf.Search.
+
+    SEGURANÇA: só aceita ações (EQUITY) listadas nos EUA cujo nome no Yahoo
+    **casa** com a razão social do BDR (ao menos uma palavra significativa em
+    comum). Assim, mesmo num soluço transitório do Yahoo, nunca troca o ticker
+    por uma empresa DIFERENTE. Retorna o símbolo ou None."""
+    if not nome_empresa or nome_empresa == '?':
+        return None
+    tokens_alvo = _tokens_nome(nome_empresa)
+    if not tokens_alvo:
+        return None
+    try:
+        nome = re.sub(
+            r'\b(ADR|ADS|Sponsored|Unsponsored|Shares?|Class|Ltd|Limited|Inc|'
+            r'Corp|Corporation|Company|Co|PLC|S\.?A\.?|N\.?V\.?|AG|SE|Oyj|ASA|'
+            r'Holdings?|Group|Incorporated)\b\.?',
+            '', nome_empresa, flags=re.IGNORECASE).strip().strip(',').strip()
+        if not nome or len(nome) < 3:
+            nome = nome_empresa
+        res = yf.Search(nome, max_results=10)
+        quotes = getattr(res, 'quotes', []) or []
+        _bolsas_us = {'NYQ', 'NMS', 'NGM', 'NCM', 'ASE', 'PCX', 'BATS', 'NYSE',
+                      'NASDAQ', 'PNK'}
+        for q in quotes:
+            sym = (q.get('symbol') or '').strip()
+            tipo = (q.get('quoteType') or '').upper()
+            exch = (q.get('exchange') or '').upper()
+            nome_q = f"{q.get('shortname','')} {q.get('longname','')}"
+            if (tipo == 'EQUITY' and sym and '.' not in sym
+                    and (exch in _bolsas_us or not exch)
+                    and tokens_alvo & _tokens_nome(nome_q)):   # nome tem que casar
+                return sym
+        return None
+    except Exception:
+        return None
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def resolver_ticker_us(ticker_bdr):
+    """Ticker US da BDR **com auto-heal**: usa o mapa curado (mapear_ticker_us);
+    se o ticker mapeado não tiver dados no Yahoo, procura pelo NOME da empresa
+    (yf.Search) e valida. Cacheado por ticker (1 execução por BDR).
+
+    É a rede de segurança para qualquer mapeamento residual errado — troca o
+    ticker apenas quando o mapeado está **comprovadamente sem dados** e a busca
+    por nome achou uma alternativa **com** dados; caso contrário mantém o mapa.
+    """
+    base = mapear_ticker_us(ticker_bdr)
+    tem = _ticker_us_tem_dados(base)
+    if tem is True or tem is None:
+        return base  # tem dados, ou checagem incerta → não arrisca
+    alt = _buscar_ticker_us_por_nome(NOMES_BDRS.get(ticker_bdr, ''))
+    if alt and alt != base and _ticker_us_tem_dados(alt) is True:
+        return alt
+    return base
 
 
 def _dividend_yield_frac(info):
@@ -2110,7 +2195,7 @@ def buscar_dados_fundamentalistas(ticker_bdr):
     3. OpenBB / FMP — empresa mãe via API alternativa
     4. BRAPI básico — último recurso (preço e volume apenas)
     """
-    ticker_us = mapear_ticker_us(ticker_bdr)
+    ticker_us = resolver_ticker_us(ticker_bdr)
 
     def _score_from_yf_info(info, fonte_label, ticker_label):
         """Processa info do yFinance e devolve dict padronizado ou None."""

@@ -557,9 +557,10 @@ O gráfico tem **4 painéis** (histórico via Yahoo; escolha o *timeframe* diár
                     # Para BDR de ETF, o ticker US vem do mapa curado (mapear_etf_us);
                     # para ações, do mapa padrão. O strip de dígitos não acha o fundo
                     # americano (ex.: BEWY39 -> 'BEWY' inexistente; correto é 'EWY').
-                    _ticker_us_graf = mapear_etf_us(ticker) if eh_etf(ticker) else mapear_ticker_us(ticker)
+                    _ticker_us_graf = mapear_etf_us(ticker) if eh_etf(ticker) else resolver_ticker_us(ticker)
                     if _ticker_us_graf and _ticker_us_graf != ticker:
-                        _df_us = obter_historico_us_escalado(_ticker_us_graf, row['Preco'])
+                        _df_us = obter_historico_us_escalado(_ticker_us_graf, row['Preco'],
+                                                             queda_dia_pct=row.get('Queda_Dia'))
                         if _df_us is not None:
                             _df_us = _df_us.dropna()
                             if len(_df_us) > len(df_ticker):
@@ -570,7 +571,7 @@ O gráfico tem **4 painéis** (histórico via Yahoo; escolha o *timeframe* diár
                     raise ValueError("__SEM_HISTORICO__")
 
                 if fonte_grafico_us:
-                    st.caption(f"ℹ️ Sem histórico da BDR na B3 — exibindo o gráfico do ativo subjacente **{fonte_grafico_us}** (EUA), convertido pela cotação atual da BDR. Forma e indicadores são os mesmos; a escala é aproximada.")
+                    st.caption(f"ℹ️ Sem histórico da BDR na B3 — exibindo o gráfico do ativo subjacente **{fonte_grafico_us}** (EUA), convertido pela cotação atual da BDR. A **última barra reflete a variação do dia da BDR** ({row['Queda_Dia']:+.2f}%); o restante segue a forma e os indicadores do ativo US (escala aproximada).")
 
                 # As métricas do detalhe (preço, queda, EMAs, sinais) vêm do screener
                 # (TradingView) — fonte atual e a MESMA base do filtro de EMAs. Para
@@ -807,9 +808,10 @@ O gráfico tem **4 painéis** (histórico via Yahoo; escolha o *timeframe* diár
                     _hist_bt = obter_historico_ticker(ticker)
                     _hist_bt = _hist_bt.dropna(subset=['Close']) if _hist_bt is not None else pd.DataFrame()
                     if _hist_bt.empty or len(_hist_bt) < 80:
-                        _tk_us_bt = mapear_etf_us(ticker) if eh_etf(ticker) else mapear_ticker_us(ticker)
+                        _tk_us_bt = mapear_etf_us(ticker) if eh_etf(ticker) else resolver_ticker_us(ticker)
                         if _tk_us_bt and _tk_us_bt != ticker:
-                            _df_us_bt = obter_historico_us_escalado(_tk_us_bt, row['Preco'])
+                            _df_us_bt = obter_historico_us_escalado(_tk_us_bt, row['Preco'],
+                                                                    queda_dia_pct=row.get('Queda_Dia'))
                             if _df_us_bt is not None:
                                 _df_us_bt = _df_us_bt.dropna(subset=['Close'])
                                 if len(_df_us_bt) > len(_hist_bt):
@@ -1120,7 +1122,7 @@ Faixas: **≥80% Excelente · 65–79 Bom · 50–64 Neutro · 35–49 Atenção
                 pass
 
             # === TRADINGVIEW SCREENER — DADOS AO VIVO ===
-            ticker_us_tv = mapear_ticker_us(ticker)
+            ticker_us_tv = resolver_ticker_us(ticker)
             with st.spinner(f'Buscando dados TradingView para {ticker_us_tv}...'):
                 dados_tv = buscar_dados_tradingview(ticker_us_tv, ticker)
             peers_tv = []
@@ -1143,7 +1145,7 @@ Reúne as notícias dos **últimos 30 dias** da empresa-mãe, de várias fontes 
 > Use como **contexto qualitativo** — notícias explicam movimentos, mas não substituem a análise técnica e o gerenciamento de risco.
                 """)
 
-            ticker_us_news    = mapear_ticker_us(ticker)
+            ticker_us_news    = resolver_ticker_us(ticker)
             # Nome da empresa: prioriza fund_data, depois NOMES_BDRS, depois row['Empresa']
             empresa_nome_news = (
                 NOMES_BDRS.get(ticker)
