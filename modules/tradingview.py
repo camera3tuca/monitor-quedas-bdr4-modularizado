@@ -1,16 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import yfinance as yf
-import matplotlib.pyplot as plt
-import seaborn as sns
-import requests
-from datetime import datetime
-import pytz
-import warnings
-import xml.etree.ElementTree as ET
-import html as html_lib
-import re
 import math
 
 
@@ -428,82 +417,6 @@ def buscar_dados_tradingview(ticker_us, ticker_bdr=''):
         }
     except Exception as e:
         return {'erro': f'Erro ao buscar dados ({ticker_us}): {str(e)}'}
-
-
-@st.cache_data(ttl=1800, show_spinner=False)
-def buscar_peers_tradingview(setor, ticker_us_excluir, top_n=5):
-    """
-    Busca peers do mesmo setor via yfinance usando uma lista curada
-    por setor (S&P 500 / NASDAQ 100 representativos).
-    """
-    PEERS_POR_SETOR = {
-        'Technology':             ['AAPL','MSFT','NVDA','GOOGL','META','AMZN','AMD','INTC','AVGO','ORCL'],
-        'Financial Services':     ['JPM','BAC','WFC','GS','MS','BLK','C','AXP','BK','USB'],
-        'Healthcare':             ['JNJ','UNH','PFE','ABBV','MRK','TMO','ABT','BMY','AMGN','GILD'],
-        'Consumer Cyclical':      ['TSLA','AMZN','HD','MCD','NKE','SBUX','TGT','LOW','BKNG','F'],
-        'Communication Services': ['GOOGL','META','NFLX','DIS','CMCSA','T','VZ','TMUS','SNAP','RBLX'],
-        'Industrials':            ['CAT','BA','HON','UPS','RTX','GE','MMM','LMT','DE','FDX'],
-        'Consumer Defensive':     ['WMT','PG','KO','PEP','COST','PM','MO','CL','GIS','KMB'],
-        'Energy':                 ['XOM','CVX','COP','EOG','SLB','PSX','VLO','MPC','OXY','PXD'],
-        'Basic Materials':        ['LIN','APD','ECL','SHW','FCX','NEM','ALB','DD','PPG','NUE'],
-        'Real Estate':            ['AMT','PLD','CCI','EQIX','SPG','O','VICI','DLR','PSA','AVB'],
-        'Utilities':              ['NEE','DUK','SO','D','EXC','AEP','SRE','PCG','ED','ETR'],
-    }
-
-    candidatos = PEERS_POR_SETOR.get(setor, [])
-    candidatos = [t for t in candidatos if t != ticker_us_excluir][:top_n + 2]
-
-    if not candidatos:
-        return []
-
-    peers = []
-    try:
-        from modules.yf_session import baixar as _yf_baixar
-        dfs = _yf_baixar(candidatos, period='5d', interval='1d',
-                         auto_adjust=True, progress=False, timeout=15)
-        if dfs.empty:
-            return []
-        if isinstance(dfs.columns, pd.MultiIndex):
-            close_df = dfs['Close']
-        else:
-            close_df = dfs[['Close']]
-
-        for ticker_p in candidatos:
-            try:
-                col_close = close_df[ticker_p] if ticker_p in close_df.columns else None
-                if col_close is None or col_close.dropna().empty:
-                    continue
-                preco_p = float(col_close.dropna().iloc[-1])
-                preco_ant_p = float(col_close.dropna().iloc[-2]) if len(col_close.dropna()) >= 2 else preco_p
-                var_p = (preco_p - preco_ant_p) / preco_ant_p * 100 if preco_ant_p else 0
-
-                # RSI rápido
-                hist_p = col_close.dropna()
-                rsi_p = None
-                if len(hist_p) >= 5:
-                    d = hist_p.diff()
-                    g = d.clip(lower=0).mean(); l = (-d.clip(upper=0)).mean()
-                    rsi_p = round(100 - 100/(1+g/(l+1e-9)), 1)
-
-                # Recomendação simplificada
-                def _rec_p(rsi):
-                    if rsi is None: return '—'
-                    if rsi < 35:  return '🟢 Compra'
-                    if rsi > 65:  return '🔴 Venda'
-                    return '🟡 Neutro'
-
-                peers.append({
-                    'ticker': ticker_p, 'preco': round(preco_p, 2),
-                    'var_pct': round(var_p, 2), 'vol_rel': 1.0,
-                    'rec': _rec_p(rsi_p), 'mktcap': 0, 'rsi': rsi_p or 50,
-                })
-                if len(peers) >= top_n:
-                    break
-            except Exception:
-                continue
-    except Exception:
-        pass
-    return peers
 
 
 @st.cache_data(ttl=300, show_spinner=False)
