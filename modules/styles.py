@@ -1,20 +1,15 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import yfinance as yf
-import matplotlib.pyplot as plt
-import seaborn as sns
-import requests
-from datetime import datetime
-import pytz
-import warnings
-import xml.etree.ElementTree as ET
-import html as html_lib
-import re
+"""Funções de estilo (CSS inline) para colorir as colunas da tabela via
+pandas Styler. Puras — recebem o valor da célula e devolvem uma string CSS."""
+
 
 def estilizar_is(val):
-    if val >= 75: return 'background-color: #d32f2f; color: white; font-weight: bold'
-    elif val >= 60: return 'background-color: #ffa726; color: black'
+    # Robusto a None/NaN/não-numérico (a coluna I.S. pode vir vazia).
+    try:
+        v = float(val)
+    except (TypeError, ValueError):
+        return ''
+    if v >= 75: return 'background-color: #d32f2f; color: white; font-weight: bold'
+    elif v >= 60: return 'background-color: #ffa726; color: black'
     else: return 'color: #888888'
 
 
