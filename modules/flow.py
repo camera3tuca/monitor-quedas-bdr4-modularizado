@@ -16,9 +16,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-import warnings
-
-warnings.filterwarnings("ignore")
+# Nota: a supressão de warnings é feita uma única vez no app.py (ponto de
+# entrada). Não repetir aqui — filterwarnings no nível de módulo é global e
+# redundante.
 
 # ── Parâmetros ──────────────────────────────────────────────────────────────
 _JANELA_VOL   = 20    # períodos para média de volume

@@ -1,16 +1,11 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import yfinance as yf
 import matplotlib.pyplot as plt
 import seaborn as sns
 import requests
 from datetime import datetime
 import pytz
 import warnings
-import xml.etree.ElementTree as ET
-import html as html_lib
-import re
 
 from modules.news import *
 from modules.news import _limpar_html, _formatar_data, _traduzir_com_mymemory, _parsear_item_rss, _buscar_rss, _buscar_yahoo_rss, _buscar_gurufocus_rss, _buscar_seekingalpha_rss, _buscar_marketwatch_rss, _buscar_google_news_rss, _buscar_finviz, _renderizar_card_noticia
