@@ -1,18 +1,11 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import math
 
 from modules.yf_session import baixar as _yf_baixar
 
 import matplotlib.pyplot as plt
-import seaborn as sns
-import requests
-from datetime import datetime
-import pytz
-import warnings
-import xml.etree.ElementTree as ET
-import html as html_lib
-import re
 import time
 import random
 
@@ -1000,7 +993,6 @@ def plotar_grafico(df_ticker, ticker, empresa, rsi, is_val,
             cl  = getattr(row_c, 'Close', None)
             if any(v is None or (hasattr(v, '__class__') and v.__class__.__name__ == 'float' and str(v) == 'nan') for v in [op, hi, lo, cl]):
                 continue
-            import math
             if any(math.isnan(float(v)) for v in [op, hi, lo, cl]):
                 continue
 
