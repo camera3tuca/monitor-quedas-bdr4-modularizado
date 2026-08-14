@@ -1,20 +1,38 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import yfinance as yf
-import matplotlib.pyplot as plt
-import seaborn as sns
-import requests
-from datetime import datetime
-import pytz
-import warnings
-import xml.etree.ElementTree as ET
-import html as html_lib
-import re
+"""Funções de estilo (CSS inline) para colorir as colunas da tabela via
+pandas Styler. Puras — recebem o valor da célula e devolvem uma string CSS."""
+
+
+# Cor por setor (rótulos em português vindos de technical._SETOR_PT).
+_CORES_SETOR = {
+    'Tecnologia':         ('#e0e7ff', '#3730a3'),
+    'Financeiro':         ('#dcfce7', '#166534'),
+    'Saúde':              ('#fee2e2', '#991b1b'),
+    'Consumo Cíclico':    ('#ffedd5', '#9a3412'),
+    'Consumo Defensivo':  ('#fef9c3', '#854d0e'),
+    'Comunicação':        ('#cffafe', '#155e75'),
+    'Energia':            ('#fef3c7', '#92400e'),
+    'Industrial':         ('#e2e8f0', '#334155'),
+    'Utilidades':         ('#ecfccb', '#3f6212'),
+    'Materiais Básicos':  ('#f5f5f4', '#57534e'),
+    'Imóveis':            ('#fae8ff', '#86198f'),
+    'Outros':             ('#f1f5f9', '#475569'),
+}
+
+
+def estilizar_setor(val):
+    """Colore a célula de setor com uma cor consistente por setor."""
+    bg, fg = _CORES_SETOR.get(str(val).strip(), ('#f1f5f9', '#475569'))
+    return f'background-color: {bg}; color: {fg}; font-weight: 600; text-align: center;'
+
 
 def estilizar_is(val):
-    if val >= 75: return 'background-color: #d32f2f; color: white; font-weight: bold'
-    elif val >= 60: return 'background-color: #ffa726; color: black'
+    # Robusto a None/NaN/não-numérico (a coluna I.S. pode vir vazia).
+    try:
+        v = float(val)
+    except (TypeError, ValueError):
+        return ''
+    if v >= 75: return 'background-color: #d32f2f; color: white; font-weight: bold'
+    elif v >= 60: return 'background-color: #ffa726; color: black'
     else: return 'color: #888888'
 
 

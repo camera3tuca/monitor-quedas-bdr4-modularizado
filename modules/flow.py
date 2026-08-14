@@ -16,9 +16,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-import warnings
-
-warnings.filterwarnings("ignore")
+# Nota: a supressão de warnings é feita uma única vez no app.py (ponto de
+# entrada). Não repetir aqui — filterwarnings no nível de módulo é global e
+# redundante.
 
 # ── Parâmetros ──────────────────────────────────────────────────────────────
 _JANELA_VOL   = 20    # períodos para média de volume
@@ -66,6 +66,16 @@ def calcular_flow(df_ticker: pd.DataFrame) -> pd.DataFrame | None:
 
     df["flow_sinal"] = df.apply(_sinal, axis=1)
     return df.dropna(subset=["flow_cum"])
+
+
+def _num(v, padrao=0.0):
+    """Coerção segura para float, tratando NaN/None/não-numérico.
+    (Necessário porque ``NaN or 0`` retorna NaN — NaN é truthy em Python.)"""
+    try:
+        v = float(v)
+        return padrao if np.isnan(v) else v
+    except (TypeError, ValueError):
+        return padrao
 
 
 def _badge(sinal: str) -> str:
@@ -170,17 +180,17 @@ Estima a **pressão compradora vs. vendedora** analisando a posição do fechame
         st.markdown(_badge(sinal_atual), unsafe_allow_html=True)
 
     with mc2:
-        vr = ultimo.get("vol_ratio", 0) or 0
+        vr = _num(ultimo.get("vol_ratio"))
         st.metric("Volume relativo", f"{vr:.2f}×",
                   delta="surge" if vr >= _LIMIAR_VOL else "normal",
                   delta_color="normal" if vr >= _LIMIAR_VOL else "off")
 
     with mc3:
-        fc = ultimo.get("flow_cum", 0) or 0
+        fc = _num(ultimo.get("flow_cum"))
         st.metric("Flow acumulado (5 candles)", f"{fc:.2f}")
 
     with mc4:
-        na = ultimo.get("net_aggression", 0) or 0
+        na = _num(ultimo.get("net_aggression"))
         label = "Compradores" if na > 0.1 else ("Vendedores" if na < -0.1 else "Neutro")
         st.metric("Agressão do último candle", f"{na:.2f}", delta=label,
                   delta_color="normal" if na > 0.1 else ("inverse" if na < -0.1 else "off"))
@@ -197,7 +207,9 @@ Estima a **pressão compradora vs. vendedora** analisando a posição do fechame
         hist["Sinal"] = hist["Sinal"].map(
             {"verde": "🟢 Compra", "amarelo": "🟡 Aguardar", "vermelho": "🔴 Venda"}
         )
-        hist.index = hist.index.strftime("%d/%m/%Y")
+        # Formata datas só se o índice for de datas (evita crash em índice numérico).
+        if isinstance(hist.index, pd.DatetimeIndex):
+            hist.index = hist.index.strftime("%d/%m/%Y")
         st.dataframe(hist.iloc[::-1], width="stretch")
 
     st.caption(

@@ -1,18 +1,11 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import math
 
 from modules.yf_session import baixar as _yf_baixar
 
 import matplotlib.pyplot as plt
-import seaborn as sns
-import requests
-from datetime import datetime
-import pytz
-import warnings
-import xml.etree.ElementTree as ET
-import html as html_lib
-import re
 import time
 import random
 
@@ -539,8 +532,31 @@ _TV_CAMPOS = [
     'name', 'description', 'close', 'change', 'gap', 'volume',
     'average_volume_10d_calc', 'RSI', 'Stoch.K',
     'MACD.macd', 'MACD.signal', 'BB.lower',
-    'EMA20', 'EMA50', 'EMA200',
+    'EMA20', 'EMA50', 'EMA200', 'sector',
 ]
+
+# Setor (canônico em inglês, via _TV_SETOR_YAHOO) -> rótulo em português para a
+# tabela e o seletor de setor.
+_SETOR_PT = {
+    'Technology': 'Tecnologia',
+    'Financial Services': 'Financeiro',
+    'Healthcare': 'Saúde',
+    'Consumer Cyclical': 'Consumo Cíclico',
+    'Consumer Defensive': 'Consumo Defensivo',
+    'Communication Services': 'Comunicação',
+    'Energy': 'Energia',
+    'Industrials': 'Industrial',
+    'Utilities': 'Utilidades',
+    'Basic Materials': 'Materiais Básicos',
+    'Real Estate': 'Imóveis',
+}
+
+
+def _setor_pt(setor_tv):
+    """Traduz o setor cru do TradingView para um rótulo em português."""
+    from modules.tradingview import _TV_SETOR_YAHOO
+    canonico = _TV_SETOR_YAHOO.get(setor_tv, setor_tv)
+    return _SETOR_PT.get(canonico, canonico) or 'Outros'
 
 
 def _liquidez(vol_medio, preco, volume_hoje=0):
@@ -665,10 +681,12 @@ def buscar_oportunidades_tv(lista_bdrs, mapa_nomes):
                              or str(row.get('description') or '').strip()
                              or ticker)
             nome_curto = _gerar_nome_curto(ticker, nome_completo)
+            setor = _setor_pt(str(row.get('sector') or '').strip())
 
             resultados.append({
                 'Ticker': ticker,
                 'Empresa': nome_curto,
+                'Setor': setor,
                 'Preco': preco,
                 'Volume': volume_financeiro,
                 'Queda_Dia': queda_dia,
@@ -1000,7 +1018,6 @@ def plotar_grafico(df_ticker, ticker, empresa, rsi, is_val,
             cl  = getattr(row_c, 'Close', None)
             if any(v is None or (hasattr(v, '__class__') and v.__class__.__name__ == 'float' and str(v) == 'nan') for v in [op, hi, lo, cl]):
                 continue
-            import math
             if any(math.isnan(float(v)) for v in [op, hi, lo, cl]):
                 continue
 

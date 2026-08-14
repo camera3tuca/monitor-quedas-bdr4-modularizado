@@ -1,12 +1,7 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import yfinance as yf
 import matplotlib.pyplot as plt
-import requests
-from datetime import datetime
-import pytz
-import warnings
 import re
 
 from modules.fundamentals import mapear_ticker_us, NOMES_BDRS, FMP_API_KEY, buscar_dados_brapi

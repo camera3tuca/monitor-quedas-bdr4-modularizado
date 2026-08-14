@@ -1,16 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import yfinance as yf
 import matplotlib.pyplot as plt
-import seaborn as sns
-import requests
-from datetime import datetime
-import pytz
-import warnings
-import xml.etree.ElementTree as ET
-import html as html_lib
-import re
 
 def _preparar_df_ml(ticker):
     """Baixa 1 ano da BDR e calcula os indicadores que o modelo consome.

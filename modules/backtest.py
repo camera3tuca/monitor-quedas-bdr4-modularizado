@@ -114,35 +114,11 @@ def backtestar_scanner(historico_df, exit_rsi=55, max_hold=20,
         stats = _rodar_engine(bt_df, entrada, rsi_arr, exit_rsi,
                               max_hold, cash, comissao)
 
-        n_trades = int(stats.get("# Trades", 0))
-        if n_trades == 0:
+        # Extração de métricas compartilhada com o backtest do Triple Screen.
+        metricas = _metricas_de_stats(stats, len(df))
+        if metricas["n_trades"] == 0:
             return {"ok": False, "motivo": "sem_trades", "amostra": len(df)}
-
-        def _f(chave, padrao=0.0):
-            v = stats.get(chave, padrao)
-            try:
-                v = float(v)
-                return padrao if np.isnan(v) else v
-            except (TypeError, ValueError):
-                return padrao
-
-        retorno = _f("Return [%]")
-        buyhold = _f("Buy & Hold Return [%]")
-        return {
-            "ok": True,
-            "amostra": len(df),
-            "n_trades": n_trades,
-            "win_rate": _f("Win Rate [%]"),
-            "retorno_pct": retorno,
-            "buyhold_pct": buyhold,
-            "vantagem_pct": retorno - buyhold,
-            "sharpe": _f("Sharpe Ratio"),
-            "max_dd_pct": _f("Max. Drawdown [%]"),
-            "exposure_pct": _f("Exposure Time [%]"),
-            "avg_trade_pct": _f("Avg. Trade [%]"),
-            "best_trade_pct": _f("Best Trade [%]"),
-            "worst_trade_pct": _f("Worst Trade [%]"),
-        }
+        return metricas
     except ImportError:
         return {"ok": False, "motivo": "lib_ausente"}
     except Exception as e:  # nunca quebra a página por causa do backtest
