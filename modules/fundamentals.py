@@ -1,18 +1,8 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
 import yfinance as yf
-import matplotlib.pyplot as plt
-import seaborn as sns
 import requests
-from datetime import datetime
-import pytz
-import warnings
-import xml.etree.ElementTree as ET
-import html as html_lib
 import re
 
-import streamlit as st
 BRAPI_TOKEN = st.secrets.get("BRAPI_TOKEN", "iExnKM1xcbQcYL3cNPhPQ3")  # Token gratuito da BRAPI
 
 
@@ -1278,7 +1268,6 @@ def calcular_score_brapi(dados_brapi):
     return max(0, min(100, score)), detalhes
 
 
-import streamlit as st
 FMP_API_KEY = st.secrets.get("FMP_API_KEY", "tBsRam74Ac6bZRWS3C8HY83C6not17Uh")
 
 
