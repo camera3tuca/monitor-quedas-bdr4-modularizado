@@ -532,8 +532,31 @@ _TV_CAMPOS = [
     'name', 'description', 'close', 'change', 'gap', 'volume',
     'average_volume_10d_calc', 'RSI', 'Stoch.K',
     'MACD.macd', 'MACD.signal', 'BB.lower',
-    'EMA20', 'EMA50', 'EMA200',
+    'EMA20', 'EMA50', 'EMA200', 'sector',
 ]
+
+# Setor (canônico em inglês, via _TV_SETOR_YAHOO) -> rótulo em português para a
+# tabela e o seletor de setor.
+_SETOR_PT = {
+    'Technology': 'Tecnologia',
+    'Financial Services': 'Financeiro',
+    'Healthcare': 'Saúde',
+    'Consumer Cyclical': 'Consumo Cíclico',
+    'Consumer Defensive': 'Consumo Defensivo',
+    'Communication Services': 'Comunicação',
+    'Energy': 'Energia',
+    'Industrials': 'Industrial',
+    'Utilities': 'Utilidades',
+    'Basic Materials': 'Materiais Básicos',
+    'Real Estate': 'Imóveis',
+}
+
+
+def _setor_pt(setor_tv):
+    """Traduz o setor cru do TradingView para um rótulo em português."""
+    from modules.tradingview import _TV_SETOR_YAHOO
+    canonico = _TV_SETOR_YAHOO.get(setor_tv, setor_tv)
+    return _SETOR_PT.get(canonico, canonico) or 'Outros'
 
 
 def _liquidez(vol_medio, preco, volume_hoje=0):
@@ -658,10 +681,12 @@ def buscar_oportunidades_tv(lista_bdrs, mapa_nomes):
                              or str(row.get('description') or '').strip()
                              or ticker)
             nome_curto = _gerar_nome_curto(ticker, nome_completo)
+            setor = _setor_pt(str(row.get('sector') or '').strip())
 
             resultados.append({
                 'Ticker': ticker,
                 'Empresa': nome_curto,
+                'Setor': setor,
                 'Preco': preco,
                 'Volume': volume_financeiro,
                 'Queda_Dia': queda_dia,

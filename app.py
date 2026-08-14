@@ -267,6 +267,10 @@ if 'oportunidades' in st.session_state:
 
     # Criar DataFrame das oportunidades
     df_res = pd.DataFrame(oportunidades)
+    # Garante a coluna Setor (o fallback yfinance pode não trazê-la).
+    if 'Setor' not in df_res.columns:
+        df_res['Setor'] = 'Outros'
+    df_res['Setor'] = df_res['Setor'].fillna('Outros').replace('', 'Outros')
     df_res = df_res.sort_values(by='Queda_Dia', ascending=True)
 
     st.success(f"✅ {len(oportunidades)} oportunidades detectadas!")
@@ -345,6 +349,17 @@ Os filtros ajudam a focar em **correções dentro de tendências de alta** (o ob
         help="Desligado por padrão para não pesar o carregamento. Ligue para "
              "validar no histórico o sinal do scanner, o Triple Screen e o "
              "modelo de ML — recalcula ao abrir cada BDR (pode levar segundos).",
+    )
+
+    # Seletor de setor — filtra a tabela por setor da empresa-mãe.
+    setores_disponiveis = sorted(
+        {o.get('Setor') or 'Outros' for o in oportunidades if (o.get('Setor') or '').strip()}
+    )
+    setor_sel = st.selectbox(
+        "🏢 Setor",
+        options=['Todos os setores'] + setores_disponiveis,
+        index=0,
+        help="Filtra as BDRs pelo setor da empresa-mãe (via TradingView).",
     )
 
     # Aplicar filtros se algum selecionado
@@ -455,6 +470,13 @@ Os filtros ajudam a focar em **correções dentro de tendências de alta** (o ob
             """, unsafe_allow_html=True)
             df_res = pd.DataFrame()  # DataFrame vazio
 
+    # Filtro de setor (aplicado sobre o resultado dos demais filtros).
+    if setor_sel != 'Todos os setores' and not df_res.empty and 'Setor' in df_res.columns:
+        df_res = df_res[df_res['Setor'] == setor_sel]
+        if df_res.empty:
+            st.info(f"Nenhuma BDR em queda hoje no setor **{setor_sel}**. "
+                    "Escolha outro setor ou 'Todos os setores'.")
+
     if not df_res.empty:
         # --- TABELA INTERATIVA ---
         st.markdown('<h3 class="section-header">📊 Oportunidades Detectadas</h3>', unsafe_allow_html=True)
@@ -488,6 +510,7 @@ Lista as BDRs que **caíram no dia** e podem ser oportunidades de compra (corre�
             df_res.style.map(estilizar_potencial, subset=['Potencial'])
                         .map(estilizar_is, subset=['IS'])
                         .map(estilizar_liquidez, subset=['Liquidez'])
+                        .map(estilizar_setor, subset=['Setor'])
             .format({
                 'Preco': 'R$ {:.2f}',
                 'Volume': 'R$ {:,.0f}',
@@ -498,9 +521,10 @@ Lista as BDRs que **caíram no dia** e podem ser oportunidades de compra (corre�
                 'Stoch': '{:.0f}',
                 'Liquidez': '{:.0f}'
             }),
-            column_order=("Ticker", "Empresa", "Liquidez", "Preco", "Queda_Dia", "IS", "Volume", "Gap", "Potencial", "Score", "Sinais"),
+            column_order=("Ticker", "Empresa", "Setor", "Liquidez", "Preco", "Queda_Dia", "IS", "Volume", "Gap", "Potencial", "Score", "Sinais"),
             column_config={
                 "Empresa": st.column_config.TextColumn("Empresa", width="medium"),
+                "Setor": st.column_config.TextColumn("🏢 Setor", width="small", help="Setor da empresa-mãe (TradingView)"),
                 "Liquidez": st.column_config.NumberColumn("💧 Liq.", width="small",
                     help="Ranking de Liquidez 0-10 (🔴 baixa → 🟢 alta)"),
                 "IS": st.column_config.NumberColumn("I.S.", help="Índice de Sobrevenda"),
